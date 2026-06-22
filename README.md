@@ -12,13 +12,13 @@ Everything runs locally in the browser:
 
 ## Screenshots
 
-The floating panel reading a translation aloud:
-
-![VoiceOne reading panel](screenshots/panel.png)
-
 Settings and the toolbar popup:
 
 ![VoiceOne settings and popup](screenshots/settings.png)
+
+The floating panel reading a translation aloud:
+
+![VoiceOne reading panel](screenshots/panel.png)
 
 ---
 
