@@ -47,10 +47,11 @@ Settings and the toolbar popup:
 
 ## Install (unpacked)
 
-1. Open `chrome://extensions`.
-2. Toggle **Developer mode** (top-right).
-3. Click **Load unpacked** and select the `D:\Claude\VoiceOne` folder.
-4. (For local PDFs via `file://`) click **Details** on VoiceOne and enable
+1. Download or clone this repository.
+2. Open `chrome://extensions`.
+3. Toggle **Developer mode** (top-right).
+4. Click **Load unpacked** and select the `VoiceOne` folder.
+5. (For local PDFs via `file://`) click **Details** on VoiceOne and enable
    **Allow access to file URLs**.
 
 ---
