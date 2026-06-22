@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VoiceOne — Settings</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 32px; max-width: 640px;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: #efebe0; color: #2e2f2b;
+        accent-color: #44483d;
+      }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      .sub { color: #8d897a; font-size: 13px; margin: 0 0 24px; }
+      section { background: #faf8f2; border: 1px solid #ded8c8; border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; }
+      h2 { font-size: 14px; margin: 0 0 14px; color: #4a4a42; }
+      label { display: block; font-size: 13px; margin-bottom: 6px; color: #44443d; }
+      .field { margin-bottom: 16px; }
+      .field:last-child { margin-bottom: 0; }
+      select, input[type="range"] { width: 100%; }
+      select {
+        font-size: 14px; color: #3a3a34; background: #fffefa;
+        border: 1px solid #d2ccba; border-radius: 8px; padding: 8px 10px;
+      }
+      .range-row { display: flex; align-items: center; gap: 12px; }
+      .range-row input { flex: 1; }
+      .range-row output { font-variant-numeric: tabular-nums; width: 38px; text-align: right; color: #8d897a; }
+      .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+      .langs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .langs label { display: flex; align-items: center; gap: 6px; margin: 0; }
+      .langs .rm { background: transparent; border: 0; color: #b3402f; font-size: 15px; line-height: 1; cursor: pointer; padding: 0 2px; margin-left: auto; }
+      .langs .rm:hover { color: #d4523c; }
+      .add-lang { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+      .add-lang input {
+        flex: 1; min-width: 120px; font-size: 13px; color: #3a3a34; background: #fffefa;
+        border: 1px solid #d2ccba; border-radius: 8px; padding: 8px 10px;
+      }
+      .add-lang button { padding: 8px 16px; }
+      .actions { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
+      button {
+        font-size: 14px; font-weight: 600; color: #f7f5ef; background: #44483d;
+        border: 0; border-radius: 10px; padding: 10px 20px; cursor: pointer;
+      }
+      button:hover { background: #565a4c; }
+      #saved { color: #4f7a3f; font-size: 13px; opacity: 0; transition: opacity .2s; }
+      #saved.show { opacity: 1; }
+      .note { font-size: 12px; color: #8d897a; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>VoiceOne Settings</h1>
+    <p class="sub">Translate selected text and read it aloud with Chrome's built-in on-device AI.</p>
+
+    <section>
+      <h2>Speech</h2>
+      <div class="field">
+        <label for="voice">Preferred voice</label>
+        <select id="voice"><option value="">Automatic (match language)</option></select>
+      </div>
+      <div class="field">
+        <label for="rate">Rate</label>
+        <div class="range-row"><input type="range" id="rate" min="0.5" max="2" step="0.1" /><output id="rateOut"></output></div>
+      </div>
+      <div class="field">
+        <label for="pitch">Pitch</label>
+        <div class="range-row"><input type="range" id="pitch" min="0" max="2" step="0.1" /><output id="pitchOut"></output></div>
+      </div>
+      <div class="field">
+        <label for="volume">Volume</label>
+        <div class="range-row"><input type="range" id="volume" min="0" max="1" step="0.1" /><output id="volumeOut"></output></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Translation</h2>
+      <div class="field">
+        <label for="defaultTarget">Default target language (popup)</label>
+        <select id="defaultTarget"></select>
+      </div>
+    </section>
+
+    <section>
+      <h2>Languages shown in the right-click menu</h2>
+      <div class="langs" id="langs"></div>
+      <div class="add-lang">
+        <input id="newLabel" type="text" placeholder="Name (e.g. Swedish)" />
+        <input id="newCode" type="text" placeholder="Code (e.g. sv)" />
+        <input id="newBcp47" type="text" placeholder="Voice locale (e.g. sv-SE, optional)" />
+        <button id="addLang" type="button">Add language</button>
+      </div>
+      <p class="note">Add any language the built-in Translator supports. Use a 2–3 letter ISO code (e.g. <b>sv</b>, <b>tr</b>, <b>vi</b>). The voice locale is optional and helps pick a matching read-aloud voice.</p>
+    </section>
+
+    <div class="actions">
+      <button id="save">Save</button>
+      <span id="saved">Saved ✓</span>
+    </div>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

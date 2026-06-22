@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VoiceOne</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      html { background: #f7f5ef; }
+      body {
+        width: 340px; margin: 0; padding: 14px;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: #f7f5ef; color: #2e2f2b;
+      }
+      h1 { font-size: 15px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+      h1 small { font-weight: 400; color: #8d897a; font-size: 11px; margin-left: auto; }
+      .hint { font-size: 11px; color: #8d897a; margin: 0 0 12px; }
+      .row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+      select, button {
+        font-size: 13px; color: #3a3a34; background: #e7e2d4;
+        border: 1px solid #d2ccba; border-radius: 8px; padding: 7px 10px; cursor: pointer;
+      }
+      select { flex: 1; }
+      .logo { width: 20px; height: 20px; border-radius: 5px; vertical-align: middle; }
+      button:hover { background: #ddd7c6; }
+      button.primary { background: #44483d; border-color: #44483d; color: #f7f5ef; font-weight: 600; }
+      button.primary:hover { background: #565a4c; }
+      .actions { gap: 8px; }
+      .actions button { flex: 1; justify-content: center; }
+      .controls { display: flex; gap: 6px; margin-top: 2px; }
+      .controls button { flex: 1; padding: 7px 0; display: flex; align-items: center; justify-content: center; }
+      .status { font-size: 11px; color: #8d897a; margin: 12px 0 4px; min-height: 14px; }
+      .status.warn { color: #b3402f; }
+      .text {
+        font-size: 14px; line-height: 1.4; max-height: 120px; overflow-y: auto;
+        white-space: pre-wrap; word-break: break-word;
+        background: #fffefa; border: 1px solid #e2dccb; border-radius: 8px;
+        padding: 8px 10px;
+      }
+      .text:empty { display: none; }
+      footer { margin-top: 14px; display: flex; }
+      footer a { color: #6b6a4a; font-size: 12px; text-decoration: none; margin-left: auto; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <h1><img class="logo" src="icons/icon48.png" alt="" /> VoiceOne <small>native AI translate & read</small></h1>
+    <p class="hint">Tip: right-click any selected text → <b>VoiceOne</b>. Or use the buttons below for the current selection.</p>
+
+    <div class="row">
+      <select id="target" title="Target language"></select>
+    </div>
+    <div class="row actions">
+      <button id="read">Read selection</button>
+      <button id="translate" class="primary">Translate &amp; read</button>
+    </div>
+
+    <div class="controls">
+      <button data-a="pause" title="Pause">⏸</button>
+      <button data-a="resume" title="Resume">▶</button>
+      <button data-a="repeat" title="Repeat">↻</button>
+      <button data-a="stop" title="Stop">⏹</button>
+      <button data-a="clear" title="Clear">Clear</button>
+    </div>
+
+    <div class="status" id="status"></div>
+    <div class="text" id="text"></div>
+
+    <footer><a id="settings">Settings ⚙</a></footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
