@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "VoiceOne",
   "version": "1.0.0",
-  "description": "Translate selected text and read it aloud using Chrome's built-in on-device AI (Translator + chrome.tts). Works on web pages and PDFs.",
+  "description": "Translate selected text and read it aloud using Chrome's built-in on-device AI. Right-click any selection to translate and speak.",
   "minimum_chrome_version": "138",
   "permissions": [
     "tts",
@@ -11,7 +11,6 @@
     "activeTab",
     "storage"
   ],
-  "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
