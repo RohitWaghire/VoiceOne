@@ -93,4 +93,10 @@ language, control playback, or open **Settings**.
 
 ---
 
+## License
+
+Released under the [MIT License](LICENSE) © 2026 Rohit Waghire.
+
+---
+
 *VoiceOne is a local-first demo of Chrome's built-in AI.*
