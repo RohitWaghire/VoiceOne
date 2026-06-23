@@ -1,5 +1,9 @@
 # VoiceOne
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Chrome](https://img.shields.io/badge/Chrome-138%2B-blue.svg)
+![Manifest](https://img.shields.io/badge/Manifest-v3-green.svg)
+
 Select any text, **translate it**, and have it **read aloud** — entirely with Chrome's
 **native, on-device AI**. Works on regular web pages and inside Chrome's built-in PDF viewer.
 
