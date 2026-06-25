@@ -1,11 +1,14 @@
 # VoiceOne
 
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Install-blue?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/voiceone/ingbabpokfkldjjpbgjkmfichemjagii)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Chrome](https://img.shields.io/badge/Chrome-138%2B-blue.svg)
 ![Manifest](https://img.shields.io/badge/Manifest-v3-green.svg)
 
 Select any text, **translate it**, and have it **read aloud** — entirely with Chrome's
 **native, on-device AI**. Works on regular web pages and inside Chrome's built-in PDF viewer.
+
+**▶ [Install from the Chrome Web Store](https://chromewebstore.google.com/detail/voiceone/ingbabpokfkldjjpbgjkmfichemjagii)**
 
 Everything runs locally in the browser:
 
@@ -49,7 +52,12 @@ The floating panel reading a translation aloud:
 
 ---
 
-## Install (unpacked)
+## Install
+
+**From the Chrome Web Store (recommended):**
+[chromewebstore.google.com/detail/voiceone](https://chromewebstore.google.com/detail/voiceone/ingbabpokfkldjjpbgjkmfichemjagii)
+
+**Or load the source (for development):**
 
 1. Download or clone this repository.
 2. Open `chrome://extensions`.
