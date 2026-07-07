@@ -10,6 +10,7 @@ const DEFAULTS = {
   defaultTarget: "en",
   menuLangs: LANGUAGES.map((l) => l.code),
   customLangs: [],
+  ytDuck: 0.12,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -25,6 +26,15 @@ function bindRange(id) {
   return sync;
 }
 const rangeSyncers = ranges.map(bindRange);
+
+// ytDuck renders as a percentage rather than a 0–1 decimal.
+{
+  const input = $("ytDuck");
+  const out = $("ytDuckOut");
+  const sync = () => (out.textContent = Math.round(Number(input.value) * 100) + "%");
+  input.addEventListener("input", sync);
+  rangeSyncers.push(sync);
+}
 
 const allLangs = () => mergeLanguages(customLangs);
 const checkedCodes = () =>
@@ -127,6 +137,7 @@ async function load() {
   $("rate").value = p.rate;
   $("pitch").value = p.pitch;
   $("volume").value = p.volume;
+  $("ytDuck").value = p.ytDuck;
   $("voice").value = p.voice;
 
   renderTargets();
@@ -143,6 +154,7 @@ $("save").addEventListener("click", async () => {
     rate: Number($("rate").value),
     pitch: Number($("pitch").value),
     volume: Number($("volume").value),
+    ytDuck: Number($("ytDuck").value),
     voice: $("voice").value,
     defaultTarget: $("defaultTarget").value,
     menuLangs: menuLangs.length ? menuLangs : allLangs().map((l) => l.code),

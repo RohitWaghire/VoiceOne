@@ -22,6 +22,7 @@ const DEFAULT_PREFS = {
   defaultTarget: "en",
   menuLangs: null, // null = all languages enabled in the menu
   customLangs: [], // user-added languages: [{ code, label, bcp47, rtl }]
+  ytDuck: 0.12, // original-audio level while dubbing YouTube (0 = mute)
 };
 
 async function getPrefs() {
@@ -290,10 +291,28 @@ function setView(tabId, patch) {
 // ---------------------------------------------------------------------------
 // Message routing (panel + popup controls)
 // ---------------------------------------------------------------------------
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.ns !== "voiceone" || !msg.from) return;
+  if (msg.action === "yt-translate") {
+    ytTranslate(msg)
+      .then(sendResponse)
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true; // async response
+  }
   handleControl(msg);
 });
+
+// Translate a batch of YouTube caption cues to English on-device.
+// The content script chunks its requests, so each call stays small.
+async function ytTranslate({ texts, source }) {
+  if (!Array.isArray(texts) || !texts.length) return { ok: true, texts: [] };
+  const src = baseCode(source || "en");
+  if (src === "en") return { ok: true, texts };
+  const translator = await getTranslator(src, "en");
+  const out = [];
+  for (const t of texts) out.push(await translator.translate(t));
+  return { ok: true, texts: out };
+}
 
 async function handleControl(msg) {
   const tabId = current?.tabId;

@@ -34,12 +34,26 @@ The floating panel reading a translation aloud:
 - **Right-click → VoiceOne** on any selected text:
   - **Auto Read Original Language** — reads the selection aloud in its own language.
   - **Translate & Read ▸ &lt;language&gt;** — translate into one of ~15 languages and read it.
+- **🎓 YouTube dubbing (new in 1.1)** — a VoiceOne button in the YouTube player re-narrates any
+  lecture in **clear English** with one click: the original audio ducks down and the video's
+  captions are spoken in sync by a clean TTS voice. Foreign-language videos are translated to
+  English **on-device** first. No downloads, no external services, no waiting.
 - **Floating control panel** with **Pause · Resume · Repeat · Stop · Clear · ✕** and a live
   status line (e.g. `Translated mixed → fr · Google français`). Drag it by the header.
 - **Toolbar popup** mirrors the panel and works as a fallback control surface.
-- **Options** for voice, rate, pitch, volume, default target language, and which languages
-  appear in the menu — including **adding your own language** (name + ISO code + optional voice
-  locale) beyond the built-in set.
+- **Options** for voice, rate, pitch, volume, default target language, the original-audio level
+  while dubbing, and which languages appear in the menu — including **adding your own language**
+  (name + ISO code + optional voice locale) beyond the built-in set.
+
+### How YouTube dubbing works (and its honest limits)
+
+The dub re-narrates the video's **caption track** (auto-generated or manual — virtually every
+instructional video has one), synchronized to the player clock. That means:
+
+- It's a **clear neutral TTS voice**, not a "de-accented" clone of the lecturer's own voice.
+- A video with **no captions at all** can't be dubbed (you'll get a clear message).
+- Caption transcription errors pass through to the narration.
+- Live streams aren't supported.
 
 ---
 
@@ -70,10 +84,21 @@ The floating panel reading a translation aloud:
 
 ## Usage
 
+**Selections (any page or PDF):**
+
 1. Select text on any page (or in a PDF).
 2. Right-click → **VoiceOne** → **Auto Read Original Language** or **Translate & Read ▸ a language**.
 3. The floating panel appears, shows the (translated) text, and reads it aloud. Use the panel or
    the toolbar popup to pause/resume/repeat/stop.
+
+**YouTube dubbing:**
+
+1. Open any YouTube video with captions (most lectures have auto-captions).
+2. Click the **EN speaker button** in the player's bottom-right controls.
+3. The lecturer's audio ducks down and a clear English voice narrates in sync. Non-English videos
+   show a brief on-device "Translating captions… %" pass first.
+4. Click the button again to stop and restore the original audio. The original-audio level is
+   adjustable in **Settings → YouTube dubbing**.
 
 You can also click the toolbar icon to read the current selection, translate to your default
 language, control playback, or open **Settings**.
