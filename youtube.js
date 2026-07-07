@@ -109,15 +109,16 @@
     btn.className = "ytp-button";
     btn.title = "VoiceOne — dub in clear English";
     btn.setAttribute("aria-pressed", "false");
-    // Centered speaker glyph (24×24 icon centered in YouTube's 36×36 viewBox).
+    // Fixed 24px speaker glyph, flex-centered like YouTube's own control buttons.
     btn.innerHTML =
-      '<svg height="100%" width="100%" viewBox="0 0 36 36" style="pointer-events:none">' +
-      '<g transform="translate(6,6)" fill="currentColor">' +
+      '<svg height="24" width="24" viewBox="0 0 24 24" style="pointer-events:none;display:block">' +
+      '<g fill="currentColor">' +
       '<path d="M3 9v6h4l5 5V4L7 9H3z"/>' +
       '<path d="M14.5 12A4.5 4.5 0 0 0 12 8v8a4.5 4.5 0 0 0 2.5-4z"/>' +
       '<path d="M12 2.06v2.06c3.39.49 6 3.39 6 6.88s-2.61 6.39-6 6.88v2.06c4.5-.51 8-4.31 8-8.94s-3.5-8.43-8-8.94z"/>' +
       "</g></svg>";
-    btn.style.cssText = "width:48px;height:100%;opacity:0.9";
+    btn.style.cssText =
+      "width:48px;height:100%;padding:0;opacity:0.9;display:inline-flex;align-items:center;justify-content:center;vertical-align:top;";
     btn.addEventListener("click", onToggle);
     controls.prepend(btn);
   }
@@ -190,6 +191,27 @@
     return cap.extractPlayerResponse(html);
   }
 
+  // Fetch a caption track's cues. Try the compact json3 format, then fall back
+  // to the default timed-text XML — YouTube returns an empty body for one
+  // format on some videos but data for the other.
+  async function fetchCaption(baseUrl) {
+    const sep = baseUrl.includes("?") ? "&" : "?";
+    const grab = (url) =>
+      fetch(url, { credentials: "same-origin" }).then((r) => r.text()).catch(() => "");
+    const json3 = await grab(baseUrl + sep + "fmt=json3");
+    if (json3.trim()) {
+      try {
+        const cues = cap.parseJson3(JSON.parse(json3));
+        if (cues.length) return cues;
+      } catch {
+        /* fall through to XML */
+      }
+    }
+    const xml = await grab(baseUrl);
+    if (xml.trim()) return cap.parseTimedTextXml(xml);
+    return [];
+  }
+
   async function startDub(myGen) {
     const video = document.querySelector("video.html5-main-video");
     if (!video) throw new Error("no video player found on this page.");
@@ -211,24 +233,13 @@
     if (!track || !track.baseUrl)
       throw new Error("this video has no captions, so it can't be dubbed.");
 
-    const sep = track.baseUrl.includes("?") ? "&" : "?";
-    const capRes = await fetch(track.baseUrl + sep + "fmt=json3", { credentials: "same-origin" });
-    const body = await capRes.text();
+    const cues = await fetchCaption(track.baseUrl);
     if (superseded(myGen, startVideoId)) {
       if (state.gen === myGen) toast(null);
       return;
     }
-    if (!body.trim())
+    if (!cues.length)
       throw new Error("couldn't load captions for this video — try another video or reload the page.");
-    let timed;
-    try {
-      timed = JSON.parse(body);
-    } catch {
-      throw new Error("couldn't read this video's caption format.");
-    }
-
-    const cues = cap.parseJson3(timed);
-    if (!cues.length) throw new Error("couldn't read this video's captions.");
 
     state.video = video;
     state.cues = cues;
