@@ -109,12 +109,15 @@
     btn.className = "ytp-button";
     btn.title = "VoiceOne — dub in clear English";
     btn.setAttribute("aria-pressed", "false");
+    // Centered speaker glyph (24×24 icon centered in YouTube's 36×36 viewBox).
     btn.innerHTML =
-      '<svg viewBox="0 0 36 36" width="100%" height="100%">' +
-      '<path d="M11 14h-4v8h4l6 5V9l-6 5z" fill="currentColor"/>' +
-      '<text x="21" y="23" font-size="10" font-weight="bold" fill="currentColor" font-family="system-ui,sans-serif">EN</text>' +
-      "</svg>";
-    btn.style.opacity = "0.9";
+      '<svg height="100%" width="100%" viewBox="0 0 36 36" style="pointer-events:none">' +
+      '<g transform="translate(6,6)" fill="currentColor">' +
+      '<path d="M3 9v6h4l5 5V4L7 9H3z"/>' +
+      '<path d="M14.5 12A4.5 4.5 0 0 0 12 8v8a4.5 4.5 0 0 0 2.5-4z"/>' +
+      '<path d="M12 2.06v2.06c3.39.49 6 3.39 6 6.88s-2.61 6.39-6 6.88v2.06c4.5-.51 8-4.31 8-8.94s-3.5-8.43-8-8.94z"/>' +
+      "</g></svg>";
+    btn.style.cssText = "width:48px;height:100%;opacity:0.9";
     btn.addEventListener("click", onToggle);
     controls.prepend(btn);
   }
@@ -172,6 +175,21 @@
   const superseded = (myGen, startVideoId) =>
     state.gen !== myGen || currentVideoId() !== startVideoId;
 
+  // Prefer the ytInitialPlayerResponse already inline in the page (fresh, no
+  // network / consent gate); fall back to re-fetching the watch page, which
+  // covers videos reached by SPA navigation.
+  async function getPlayerResponse(videoId) {
+    for (const s of document.getElementsByTagName("script")) {
+      const txt = s.textContent;
+      if (txt && txt.indexOf("ytInitialPlayerResponse") !== -1) {
+        const pr = cap.extractPlayerResponse(txt);
+        if (pr?.videoDetails?.videoId === videoId) return pr;
+      }
+    }
+    const html = await (await fetch(location.href, { credentials: "same-origin" })).text();
+    return cap.extractPlayerResponse(html);
+  }
+
   async function startDub(myGen) {
     const video = document.querySelector("video.html5-main-video");
     if (!video) throw new Error("no video player found on this page.");
@@ -183,22 +201,30 @@
     if (superseded(myGen, startVideoId)) return; // navigated/stopped during prep
 
     toast("Loading captions…", true);
-    const html = await (await fetch(location.href, { credentials: "same-origin" })).text();
+    const pr = await getPlayerResponse(startVideoId);
     if (superseded(myGen, startVideoId)) {
       if (state.gen === myGen) toast(null);
       return;
     }
 
-    const pr = cap.extractPlayerResponse(html);
     const track = cap.pickTrack(cap.listCaptionTracks(pr));
     if (!track || !track.baseUrl)
       throw new Error("this video has no captions, so it can't be dubbed.");
 
     const sep = track.baseUrl.includes("?") ? "&" : "?";
-    const timed = await (await fetch(track.baseUrl + sep + "fmt=json3")).json();
+    const capRes = await fetch(track.baseUrl + sep + "fmt=json3", { credentials: "same-origin" });
+    const body = await capRes.text();
     if (superseded(myGen, startVideoId)) {
       if (state.gen === myGen) toast(null);
       return;
+    }
+    if (!body.trim())
+      throw new Error("couldn't load captions for this video — try another video or reload the page.");
+    let timed;
+    try {
+      timed = JSON.parse(body);
+    } catch {
+      throw new Error("couldn't read this video's caption format.");
     }
 
     const cues = cap.parseJson3(timed);
