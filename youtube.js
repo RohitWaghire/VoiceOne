@@ -176,39 +176,82 @@
   const superseded = (myGen, startVideoId) =>
     state.gen !== myGen || currentVideoId() !== startVideoId;
 
-  // Prefer the ytInitialPlayerResponse already inline in the page (fresh, no
-  // network / consent gate); fall back to re-fetching the watch page, which
-  // covers videos reached by SPA navigation.
-  async function getPlayerResponse(videoId) {
+  // The caption URLs in the page's own player data are gated behind a
+  // proof-of-origin token since 2025 and return HTTP 200 with an EMPTY body
+  // when fetched outside YouTube's player. The InnerTube API queried as the
+  // ANDROID client returns caption URLs that still work, so ask it first and
+  // keep the page's player response only as a fallback for track listing.
+  // The page embeds a visitorData token; sending it (plus the tab's own
+  // youtube.com cookies) lets the InnerTube call pass YouTube's bot check.
+  function getVisitorData() {
+    for (const s of document.getElementsByTagName("script")) {
+      const m = /"visitorData":"([^"]+)"/.exec(s.textContent || "");
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  async function getCaptionTracks(videoId) {
+    try {
+      const visitorData = getVisitorData();
+      const r = await fetch("https://www.youtube.com/youtubei/v1/player", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName: "ANDROID",
+              clientVersion: "20.10.38",
+              androidSdkVersion: 30,
+              hl: "en",
+              ...(visitorData ? { visitorData } : {}),
+            },
+          },
+          videoId,
+          contentCheckOk: true,
+          racyCheckOk: true,
+        }),
+      });
+      const tracks = cap.listCaptionTracks(await r.json());
+      if (tracks.length) return tracks;
+    } catch {
+      /* fall through to page data */
+    }
     for (const s of document.getElementsByTagName("script")) {
       const txt = s.textContent;
       if (txt && txt.indexOf("ytInitialPlayerResponse") !== -1) {
         const pr = cap.extractPlayerResponse(txt);
-        if (pr?.videoDetails?.videoId === videoId) return pr;
+        if (pr?.videoDetails?.videoId === videoId)
+          return cap.listCaptionTracks(pr);
       }
     }
     const html = await (await fetch(location.href, { credentials: "same-origin" })).text();
-    return cap.extractPlayerResponse(html);
+    return cap.listCaptionTracks(cap.extractPlayerResponse(html));
   }
 
-  // Fetch a caption track's cues. Try the compact json3 format, then fall back
-  // to the default timed-text XML — YouTube returns an empty body for one
-  // format on some videos but data for the other.
+  // Fetch a caption track's cues. Sniff the response body — depending on the
+  // endpoint, YouTube answers with json3 JSON or srv3/classic timed-text XML
+  // (and may ignore the fmt parameter entirely).
   async function fetchCaption(baseUrl) {
     const sep = baseUrl.includes("?") ? "&" : "?";
-    const grab = (url) =>
-      fetch(url, { credentials: "same-origin" }).then((r) => r.text()).catch(() => "");
-    const json3 = await grab(baseUrl + sep + "fmt=json3");
-    if (json3.trim()) {
+    for (const url of [baseUrl + sep + "fmt=json3", baseUrl]) {
+      let body = "";
       try {
-        const cues = cap.parseJson3(JSON.parse(json3));
+        body = (await (await fetch(url, { credentials: "omit" })).text()).trim();
+      } catch {
+        continue;
+      }
+      if (!body) continue; // pot-gated empty response — try next variant
+      try {
+        const cues = body[0] === "{"
+          ? cap.parseJson3(JSON.parse(body))
+          : cap.parseTimedTextXml(body);
         if (cues.length) return cues;
       } catch {
-        /* fall through to XML */
+        /* malformed — try next variant */
       }
     }
-    const xml = await grab(baseUrl);
-    if (xml.trim()) return cap.parseTimedTextXml(xml);
     return [];
   }
 
@@ -223,13 +266,13 @@
     if (superseded(myGen, startVideoId)) return; // navigated/stopped during prep
 
     toast("Loading captions…", true);
-    const pr = await getPlayerResponse(startVideoId);
+    const tracks = await getCaptionTracks(startVideoId);
     if (superseded(myGen, startVideoId)) {
       if (state.gen === myGen) toast(null);
       return;
     }
 
-    const track = cap.pickTrack(cap.listCaptionTracks(pr));
+    const track = cap.pickTrack(tracks);
     if (!track || !track.baseUrl)
       throw new Error("this video has no captions, so it can't be dubbed.");
 
