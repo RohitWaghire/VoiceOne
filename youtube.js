@@ -246,7 +246,21 @@
   }
 
   // ------------------------------------------------------------ dub control
+  // After an extension update/reload, scripts already injected into open tabs
+  // are orphaned: chrome.runtime disappears and every extension API throws.
+  const contextAlive = () => {
+    try {
+      return !!chrome.runtime?.id;
+    } catch {
+      return false;
+    }
+  };
+
   async function onToggle() {
+    if (!contextAlive()) {
+      toast("VoiceOne was updated — reload this page to keep dubbing.");
+      return;
+    }
     if (state.preparing) return;
     if (state.active) {
       stopDub("Dub off — original audio restored.");
