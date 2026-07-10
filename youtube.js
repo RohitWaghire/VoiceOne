@@ -1,11 +1,12 @@
 // youtube.js — VoiceOne's one-click YouTube dub (content script).
 // Adds a button to the YouTube player. On click: fetch the video's caption
-// track, translate it to English on-device if needed (via the service worker),
-// duck the original audio, and narrate the captions in clear English with
-// speechSynthesis, kept in sync with the video clock.
+// track, translate it on-device to the chosen dub language (via the service
+// worker), duck the original audio, and narrate the captions in sync with the
+// video clock. A small panel offers the dub language, a live original-audio
+// slider, and stop.
 //
 // Classic (non-module) content script: shared helpers are pulled in with a
-// dynamic import of lib/captions.js (declared web-accessible in the manifest).
+// dynamic import of lib/*.js (declared web-accessible in the manifest).
 
 (() => {
   "use strict";
@@ -14,10 +15,11 @@
 
   const BTN_ID = "voiceone-dub-btn";
   const TOAST_ID = "voiceone-yt-toast";
+  const PANEL_ID = "voiceone-yt-panel";
   const MS_PER_CHAR = 62; // ≈16 chars/sec at TTS rate 1.0
 
-  let lib = null; // lazy-loaded lib/captions.js module
-  let cap = null; // its exports, cached for synchronous use once a dub is live
+  let cap = null; // lib/captions.js exports
+  let langs = null; // lib/languages.js exports
   const state = {
     active: false, // dub currently on
     preparing: false, // click handled, captions loading
@@ -30,14 +32,16 @@
     applyingDuck: false, // guards our own volume writes from onVolumeChange
     inAd: false,
     voice: null,
-    prefs: { rate: 1.0, ytDuck: 0.12 },
+    target: null, // dub language (base code, e.g. "en"); null until prefs load
+    bcp47: "en-US",
+    prefs: { rate: 1.0, ytDuck: 0.12, customLangs: [] },
     videoId: null, // which video the cues belong to
   };
 
   // ------------------------------------------------------------------ utils
-  async function getLib() {
-    if (!lib) lib = await import(chrome.runtime.getURL("lib/captions.js"));
-    return lib;
+  async function loadLibs() {
+    if (!cap) cap = await import(chrome.runtime.getURL("lib/captions.js"));
+    if (!langs) langs = await import(chrome.runtime.getURL("lib/languages.js"));
   }
 
   async function loadPrefs() {
@@ -46,9 +50,21 @@
       if (prefs) {
         if (typeof prefs.rate === "number") state.prefs.rate = prefs.rate;
         if (typeof prefs.ytDuck === "number") state.prefs.ytDuck = prefs.ytDuck;
+        if (Array.isArray(prefs.customLangs)) state.prefs.customLangs = prefs.customLangs;
+        if (!state.target) state.target = prefs.ytTarget || prefs.defaultTarget || "en";
       }
     } catch {
       /* defaults stand */
+    }
+    if (!state.target) state.target = "en";
+  }
+
+  async function savePref(patch) {
+    try {
+      const { prefs } = await chrome.storage.sync.get("prefs");
+      await chrome.storage.sync.set({ prefs: { ...(prefs || {}), ...patch } });
+    } catch {
+      /* non-fatal */
     }
   }
 
@@ -61,18 +77,22 @@
     return !!p && (p.classList.contains("ad-showing") || p.classList.contains("ad-interrupting"));
   };
 
-  function pickVoice() {
+  function pickVoiceFor(bcp47) {
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return null;
+    const want = bcp47.toLowerCase();
+    const base = want.split("-")[0];
+    const lang = (v) => (v.lang || "").toLowerCase();
     return (
-      voices.find((v) => /Google US English/i.test(v.name)) ||
-      voices.find((v) => (v.lang || "").toLowerCase() === "en-us") ||
-      voices.find((v) => (v.lang || "").toLowerCase().startsWith("en")) ||
+      voices.find((v) => /^google/i.test(v.name) && lang(v) === want) ||
+      voices.find((v) => lang(v) === want) ||
+      voices.find((v) => /^google/i.test(v.name) && lang(v).startsWith(base)) ||
+      voices.find((v) => lang(v).startsWith(base)) ||
       null
     );
   }
   window.speechSynthesis?.addEventListener?.("voiceschanged", () => {
-    if (!state.voice) state.voice = pickVoice();
+    if (state.active) state.voice = pickVoiceFor(state.bcp47) || state.voice;
   });
 
   // ------------------------------------------------------------------ toast
@@ -97,6 +117,82 @@
     if (!sticky) el._t = setTimeout(() => el.remove(), 4000);
   }
 
+  // ------------------------------------------------------------ dub panel
+  function showPanel() {
+    toast(null); // panel replaces the transient toast
+    let el = document.getElementById(PANEL_ID);
+    if (el) return el;
+    el = document.createElement("div");
+    el.id = PANEL_ID;
+    el.style.cssText =
+      "position:fixed;left:16px;bottom:16px;z-index:2147483647;width:300px;" +
+      "background:#f7f5ef;color:#2e2f2b;border:1px solid #d9d3c4;" +
+      "border-radius:12px;padding:10px 12px;font:13px system-ui,sans-serif;" +
+      "box-shadow:0 10px 32px rgba(60,55,40,.3);";
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <b style="font-size:13px">VoiceOne dub</b>
+        <span data-vo="status" style="flex:1;font-size:11px;color:#8d897a;text-align:right"></span>
+        <button data-vo="close" title="Stop dubbing" style="border:0;background:transparent;cursor:pointer;font-size:14px;color:#2e2f2b;padding:0 2px">✕</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <label style="font-size:12px;color:#5a584e">Dub into</label>
+        <select data-vo="lang" style="flex:1;font-size:12px;color:#3a3a34;background:#fffefa;border:1px solid #d2ccba;border-radius:7px;padding:4px 6px"></select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:12px;color:#5a584e;white-space:nowrap">Original audio</label>
+        <input data-vo="duck" type="range" min="0" max="0.5" step="0.01" style="flex:1;accent-color:#44483d">
+        <output data-vo="duckout" style="font-size:11px;color:#8d897a;width:32px;text-align:right"></output>
+      </div>`;
+    document.documentElement.appendChild(el);
+
+    // YouTube's global shortcuts (space, arrows…) must not fire while using the panel.
+    for (const evt of ["keydown", "keyup", "keypress"])
+      el.addEventListener(evt, (e) => e.stopPropagation());
+
+    el.querySelector('[data-vo="close"]').addEventListener("click", () =>
+      stopDub("Dub off — original audio restored.")
+    );
+
+    const sel = el.querySelector('[data-vo="lang"]');
+    for (const l of langs.mergeLanguages(state.prefs.customLangs)) {
+      const opt = document.createElement("option");
+      opt.value = l.code;
+      opt.textContent = l.label;
+      if (l.code === state.target) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    sel.addEventListener("change", () => {
+      state.target = sel.value;
+      savePref({ ytTarget: sel.value });
+      restartDub();
+    });
+
+    const duck = el.querySelector('[data-vo="duck"]');
+    const duckOut = el.querySelector('[data-vo="duckout"]');
+    const syncDuck = () => (duckOut.textContent = Math.round(duck.value * 100) + "%");
+    duck.value = state.prefs.ytDuck;
+    syncDuck();
+    duck.addEventListener("input", () => {
+      state.prefs.ytDuck = Number(duck.value);
+      syncDuck();
+      if (state.active) applyDuck();
+    });
+    duck.addEventListener("change", () => savePref({ ytDuck: Number(duck.value) }));
+    return el;
+  }
+
+  function hidePanel() {
+    document.getElementById(PANEL_ID)?.remove();
+  }
+
+  // Status line: panel when present, transient toast otherwise.
+  function setStatus(text, sticky = false) {
+    const s = document.querySelector(`#${PANEL_ID} [data-vo="status"]`);
+    if (s) s.textContent = text || "";
+    else if (text) toast(text, sticky);
+  }
+
   // ----------------------------------------------------------------- button
   function ensureButton() {
     if (location.pathname !== "/watch") return;
@@ -107,9 +203,8 @@
     const btn = document.createElement("button");
     btn.id = BTN_ID;
     btn.className = "ytp-button";
-    btn.title = "VoiceOne — dub in clear English";
+    btn.title = "VoiceOne — dub this video";
     btn.setAttribute("aria-pressed", "false");
-    // Fixed 24px speaker glyph, flex-centered like YouTube's own control buttons.
     btn.innerHTML =
       '<svg height="24" width="24" viewBox="0 0 24 24" style="pointer-events:none;display:block">' +
       '<g fill="currentColor">' +
@@ -173,14 +268,14 @@
     }
   }
 
+  async function restartDub() {
+    stopDub(null);
+    await onToggle();
+  }
+
   const superseded = (myGen, startVideoId) =>
     state.gen !== myGen || currentVideoId() !== startVideoId;
 
-  // The caption URLs in the page's own player data are gated behind a
-  // proof-of-origin token since 2025 and return HTTP 200 with an EMPTY body
-  // when fetched outside YouTube's player. The InnerTube API queried as the
-  // ANDROID client returns caption URLs that still work, so ask it first and
-  // keep the page's player response only as a fallback for track listing.
   // The page embeds a visitorData token; sending it (plus the tab's own
   // youtube.com cookies) lets the InnerTube call pass YouTube's bot check.
   function getVisitorData() {
@@ -191,6 +286,11 @@
     return null;
   }
 
+  // The caption URLs in the page's own player data are gated behind a
+  // proof-of-origin token since 2025 and return HTTP 200 with an EMPTY body
+  // when fetched outside YouTube's player. The InnerTube API queried as the
+  // ANDROID client returns caption URLs that still work, so ask it first and
+  // keep the page's player response only as a fallback for track listing.
   async function getCaptionTracks(videoId) {
     try {
       const visitorData = getVisitorData();
@@ -262,7 +362,7 @@
 
     const startVideoId = currentVideoId();
     await loadPrefs();
-    cap = await getLib();
+    await loadLibs();
     if (superseded(myGen, startVideoId)) return; // navigated/stopped during prep
 
     toast("Loading captions…", true);
@@ -272,7 +372,7 @@
       return;
     }
 
-    const track = cap.pickTrack(tracks);
+    const track = cap.pickTrack(tracks, state.target);
     if (!track || !track.baseUrl)
       throw new Error("this video has no captions, so it can't be dubbed.");
 
@@ -287,7 +387,8 @@
     state.video = video;
     state.cues = cues;
     state.videoId = startVideoId;
-    state.voice = state.voice || pickVoice();
+    state.bcp47 = langs.bcp47For(state.target);
+    state.voice = pickVoiceFor(state.bcp47);
     state.idx = cap.findCueIndex(cues, video.currentTime * 1000);
 
     state.savedVolume = video.volume;
@@ -296,15 +397,19 @@
     state.active = true;
     state.inAd = isAdShowing();
     setButtonState("on");
+    showPanel();
 
-    const lang = (track.languageCode || "en").toLowerCase();
-    if (!lang.startsWith("en")) translateCues(myGen, lang);
-    else toast("Dubbing in clear English — click the button again to stop.");
+    const trackBase = (track.languageCode || "en").toLowerCase().split("-")[0];
+    if (trackBase !== state.target) translateCues(myGen, trackBase);
+    else setStatus(`Dubbing in ${langs.labelFor(state.target)}`);
 
     video.addEventListener("seeking", onSeek);
     video.addEventListener("pause", onPause);
     video.addEventListener("play", onPlay);
     video.addEventListener("volumechange", onVolumeChange);
+    // timeupdate keeps cues flowing in background tabs, where setInterval is
+    // throttled; the interval keeps them flowing when the video stalls.
+    video.addEventListener("timeupdate", tick);
     state.timer = setInterval(tick, 200);
   }
 
@@ -324,11 +429,13 @@
       state.video.removeEventListener("pause", onPause);
       state.video.removeEventListener("play", onPlay);
       state.video.removeEventListener("volumechange", onVolumeChange);
+      state.video.removeEventListener("timeupdate", tick);
     }
     state.video = null;
     state.cues = [];
     state.savedVolume = null;
     setButtonState("off");
+    hidePanel();
     toast(null);
     if (message) toast(message);
   }
@@ -382,7 +489,7 @@
 
     const u = new SpeechSynthesisUtterance(cue.text);
     if (state.voice) u.voice = state.voice;
-    u.lang = "en-US";
+    u.lang = state.bcp47;
     u.rate = rate;
     u.volume = 1;
     synth.speak(u);
@@ -404,9 +511,10 @@
   // ------------------------------------------------------- translation
   async function translateCues(myGen, sourceLang) {
     const cues = state.cues; // captured — a later dub gets its own fresh array
+    const target = state.target;
     // Keep originals; clear text so untranslated cues aren't spoken yet.
     for (const c of cues) {
-      c.orig = c.text;
+      c.orig = c.orig || c.text;
       c.text = null;
     }
     // Translate from the playhead forward first, then wrap to the start.
@@ -419,7 +527,7 @@
     for (let at = 0; at < order.length; at += CHUNK) {
       if (state.gen !== myGen) return; // superseded before this chunk
       const slice = order.slice(at, at + CHUNK);
-      const res = await sendTranslate(sourceLang, slice.map((i) => cues[i].orig));
+      const res = await sendTranslate(sourceLang, target, slice.map((i) => cues[i].orig));
       if (state.gen !== myGen) return; // superseded during the await
       if (!res?.ok) {
         stopDub(`VoiceOne: translation failed — ${res?.error || "unknown error"}`);
@@ -430,14 +538,14 @@
       });
       done += slice.length;
       const pct = Math.round((done / order.length) * 100);
-      if (pct < 100) toast(`Translating captions on-device… ${pct}%`, true);
+      if (pct < 100) setStatus(`Translating… ${pct}%`, true);
     }
-    if (state.active) toast("Dubbing in clear English — click the button again to stop.");
+    if (state.active) setStatus(`Dubbing in ${langs.labelFor(target)}`);
   }
 
   // One retry covers a transient service-worker restart during the first
   // (model-download) chunk.
-  async function sendTranslate(source, texts) {
+  async function sendTranslate(source, target, texts) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const res = await chrome.runtime.sendMessage({
@@ -445,6 +553,7 @@
           from: "yt",
           action: "yt-translate",
           source,
+          target,
           texts,
         });
         if (res?.ok) return res;

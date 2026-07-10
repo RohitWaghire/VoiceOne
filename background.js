@@ -302,13 +302,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   handleControl(msg);
 });
 
-// Translate a batch of YouTube caption cues to English on-device.
+// Translate a batch of YouTube caption cues to the dub target on-device.
 // The content script chunks its requests, so each call stays small.
-async function ytTranslate({ texts, source }) {
+async function ytTranslate({ texts, source, target }) {
   if (!Array.isArray(texts) || !texts.length) return { ok: true, texts: [] };
   const src = baseCode(source || "en");
-  if (src === "en") return { ok: true, texts };
-  const translator = await getTranslator(src, "en");
+  const tgt = baseCode(target || "en");
+  if (src === tgt) return { ok: true, texts };
+  const translator = await getTranslator(src, tgt);
   const out = [];
   for (const t of texts) out.push(await translator.translate(t));
   return { ok: true, texts: out };

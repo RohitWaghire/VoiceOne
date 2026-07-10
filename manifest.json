@@ -24,7 +24,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["lib/captions.js"],
+      "resources": ["lib/captions.js", "lib/languages.js"],
       "matches": ["https://www.youtube.com/*"],
       "use_dynamic_url": true
     }
