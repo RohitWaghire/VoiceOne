@@ -5,8 +5,9 @@
 ![Chrome](https://img.shields.io/badge/Chrome-138%2B-blue.svg)
 ![Manifest](https://img.shields.io/badge/Manifest-v3-green.svg)
 
-Select any text, **translate it**, and have it **read aloud** — entirely with Chrome's
-**native, on-device AI**. Works on regular web pages and inside Chrome's built-in PDF viewer.
+Select any text, **translate it**, and have it **read aloud** — or **dub a whole YouTube
+lecture** into your language with one click. Entirely powered by Chrome's **native, on-device
+AI**; works on regular web pages and inside Chrome's built-in PDF viewer.
 
 **▶ [Install from the Chrome Web Store](https://chromewebstore.google.com/detail/voiceone/ingbabpokfkldjjpbgjkmfichemjagii)**
 
@@ -35,9 +36,10 @@ The floating panel reading a translation aloud:
   - **Auto Read Original Language** — reads the selection aloud in its own language.
   - **Translate & Read ▸ &lt;language&gt;** — translate into one of ~15 languages and read it.
 - **🎓 YouTube dubbing (new in 1.1)** — a VoiceOne button in the YouTube player re-narrates any
-  lecture in **clear English** with one click: the original audio ducks down and the video's
-  captions are spoken in sync by a clean TTS voice. Foreign-language videos are translated to
-  English **on-device** first. No downloads, no external services, no waiting.
+  lecture in **the language you choose** with one click: the original audio ducks down and the
+  video's captions are spoken in sync by a clean TTS voice, translated **on-device** when needed.
+  A small on-page panel lets you **switch the dub language live**, adjust how loud the original
+  stays, and stop. No downloads, no external services, no waiting.
 - **Floating control panel** with **Pause · Resume · Repeat · Stop · Clear · ✕** and a live
   status line (e.g. `Translated mixed → fr · Google français`). Drag it by the header.
 - **Toolbar popup** mirrors the panel and works as a fallback control surface.
@@ -48,7 +50,9 @@ The floating panel reading a translation aloud:
 ### How YouTube dubbing works (and its honest limits)
 
 The dub re-narrates the video's **caption track** (auto-generated or manual — virtually every
-instructional video has one), synchronized to the player clock. That means:
+instructional video has one), synchronized to the player clock. If the video already has a
+caption track in your chosen language, it's used directly — no translation step at all. That
+means:
 
 - It's a **clear neutral TTS voice**, not a "de-accented" clone of the lecturer's own voice.
 - A video with **no captions at all** can't be dubbed (you'll get a clear message).
@@ -94,11 +98,12 @@ instructional video has one), synchronized to the player clock. That means:
 **YouTube dubbing:**
 
 1. Open any YouTube video with captions (most lectures have auto-captions).
-2. Click the **EN speaker button** in the player's bottom-right controls.
-3. The lecturer's audio ducks down and a clear English voice narrates in sync. Non-English videos
-   show a brief on-device "Translating captions… %" pass first.
-4. Click the button again to stop and restore the original audio. The original-audio level is
-   adjustable in **Settings → YouTube dubbing**.
+2. Click the **speaker button** in the player's bottom-right controls.
+3. The lecturer's audio ducks down and a clear voice narrates in sync. Videos in another language
+   show a brief on-device "Translating… %" pass first.
+4. Use the **VoiceOne dub panel** (bottom-left) to switch the dub language live, adjust how loud
+   the original audio stays, or stop (✕). Clicking the player button again also stops. Defaults
+   live in **Settings → YouTube dubbing**.
 
 You can also click the toolbar icon to read the current selection, translate to your default
 language, control playback, or open **Settings**.
@@ -112,9 +117,11 @@ language, control playback, or open **Settings**.
 | `manifest.json` | MV3 manifest, permissions, menu |
 | `background.js` | Service worker: menus, detection, translation, `chrome.tts`, panel state |
 | `panel.js` | Floating control panel injected into the page (Shadow DOM) |
+| `youtube.js` | YouTube content script: dub button, control panel, caption fetch, synced narration |
 | `popup.html` / `popup.js` | Toolbar popup + fallback controls |
 | `options.html` / `options.js` | Preferences (`chrome.storage.sync`) |
 | `lib/languages.js` | Language list + TTS hints |
+| `lib/captions.js` | YouTube caption helpers: player-response extraction, track picking, json3/XML parsing |
 | `icons/` | Toolbar/store icons |
 
 ---
@@ -127,6 +134,10 @@ language, control playback, or open **Settings**.
   controls and status.
 - **No voice / wrong language voice** — install or pick a voice in **Settings**; some languages
   use Chrome's online "Google" voices, which need a network connection.
+- **"VoiceOne was updated — reload this page"** — after installing or reloading the extension,
+  YouTube tabs that were already open keep the old script; refresh the tab once.
+- **"couldn't load captions"** — YouTube occasionally gates caption requests; reload the page and
+  try again, or try another video.
 
 ---
 
