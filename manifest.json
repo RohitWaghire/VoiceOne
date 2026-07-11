@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "VoiceOne",
   "version": "1.1.0",
-  "description": "Translate selected text and read it aloud using Chrome's built-in on-device AI. Right-click any selection to translate and speak.",
+  "description": "Translate selected text and read it aloud with Chrome's built-in on-device AI — or dub YouTube videos into your language.",
   "minimum_chrome_version": "138",
   "permissions": [
     "tts",
