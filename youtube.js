@@ -230,8 +230,12 @@
   // ------------------------------------------------------------ volume duck
   function applyDuck() {
     if (!state.video) return;
+    const duck = Math.max(0, Math.min(1, state.prefs.ytDuck));
+    // A same-value write fires no volumechange event, which would leave the
+    // applyingDuck flag stale and swallow the next genuine user volume event.
+    if (Math.abs(state.video.volume - duck) < 0.001) return;
     state.applyingDuck = true;
-    state.video.volume = Math.max(0, Math.min(1, state.prefs.ytDuck));
+    state.video.volume = duck;
   }
   // YouTube re-writes video.volume on slider/keyboard/ad transitions, which
   // would undo our duck. Re-assert it, and treat the user's level as the new
@@ -279,7 +283,9 @@
         toast(`VoiceOne: ${err.message || "couldn't start the dub."}`);
       }
     } finally {
-      state.preparing = false;
+      // Only the generation that owns the flag may clear it — a superseded
+      // prep must not clear the flag of the restart that replaced it.
+      if (state.gen === myGen) state.preparing = false;
     }
   }
 
@@ -431,6 +437,7 @@
   function stopDub(message) {
     state.gen++; // invalidate any in-flight prep/translation
     state.active = false;
+    state.preparing = false; // the invalidated prep no longer owns the flag
     state.inAd = false;
     clearInterval(state.timer);
     state.timer = null;

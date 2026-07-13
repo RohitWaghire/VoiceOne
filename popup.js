@@ -57,7 +57,8 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
 // ---------------------------------------------------------------------------
 (async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id || !/youtube\.com\/watch/.test(tab.url || "")) return;
+  // Only where our content script actually runs (www.youtube.com watch pages).
+  if (!tab?.id || !/^https:\/\/www\.youtube\.com\/watch/.test(tab.url || "")) return;
 
   const sendYt = (cmd, extra = {}) =>
     chrome.tabs.sendMessage(tab.id, { ns: "voiceone-yt", cmd, ...extra }).catch(() => null);
@@ -76,6 +77,7 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
   const toggleBtn = $("ytToggle");
   const setToggle = (active, preparing) => {
     toggleBtn.textContent = preparing ? "Starting…" : active ? "Stop dubbing" : "Start dubbing";
+    toggleBtn.disabled = !!preparing; // a click mid-prep would no-op yet flip the label
     $("ytStatus").textContent = active ? "dubbing" : "";
   };
   setToggle(st.active, st.preparing);

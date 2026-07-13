@@ -1,9 +1,10 @@
 # VoiceOne — Privacy Policy
 
-_Last updated: 2026-06-22_
+_Last updated: 2026-07-08_
 
-VoiceOne is a Chrome extension that translates selected text and reads it aloud using
-Chrome's built‑in, on‑device AI. This policy explains what data the extension handles.
+VoiceOne is a Chrome extension that translates selected text and reads it aloud — and can
+dub YouTube videos — using Chrome's built‑in, on‑device AI. This policy explains what data
+the extension handles.
 
 ## Summary
 
@@ -25,10 +26,21 @@ analytics, advertising, or tracking service. There are no developer‑operated s
   - Selected text is held only in memory for the duration of a read‑aloud action and is **not
     persisted**.
 
+- **YouTube video captions (dubbing).** When you click the dub button on a YouTube video,
+  VoiceOne fetches that video's **caption track**:
+  - Caption requests go **only to YouTube itself** (`youtube.com`), from your own browser
+    session — the same way the site loads captions for its player. No other server is
+    contacted, and nothing is sent to the developer.
+  - Captions are **translated on your device** by Chrome's built‑in Translator and narrated
+    with your browser's speech synthesis. As with read‑aloud, choosing one of Chrome's
+    **online ("Google") voices** means Chrome sends the text to its speech service under
+    Google's own privacy terms.
+  - Captions are held only in memory while the dub is active and are **not persisted**.
+
 - **Your preferences.** Settings such as preferred voice, speech rate/pitch/volume, default
-  target language, and any custom languages you add are saved with `chrome.storage.sync`.
-  Chrome may sync these settings across your own signed‑in devices through your Google account.
-  The developer cannot access them.
+  target language, dub language, original‑audio level, and any custom languages you add are
+  saved with `chrome.storage.sync`. Chrome may sync these settings across your own signed‑in
+  devices through your Google account. The developer cannot access them.
 
 ## What the extension does NOT do
 
@@ -42,8 +54,9 @@ analytics, advertising, or tracking service. There are no developer‑operated s
 
 VoiceOne requests the minimum permissions needed: `tts` (read aloud), `contextMenus`
 (right‑click menu), `scripting` + `activeTab` (show the panel / read the selection on the
-current tab only when you invoke the extension), and `storage` (save your preferences). It does
-**not** request access to all websites.
+current tab only when you invoke the extension), and `storage` (save your preferences). Its
+only site access is **youtube.com**, used solely to show the dub button and load captions
+for the dubbing feature — it does **not** request access to other websites.
 
 ## Contact
 
