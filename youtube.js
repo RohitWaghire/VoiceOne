@@ -594,6 +594,45 @@
     }
   }
 
+  // ------------------------------------------------- popup remote control
+  // Distinct namespace from "voiceone" so the service worker's router ignores
+  // these; they travel popup → this tab's content script only.
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg?.ns !== "voiceone-yt") return;
+    if (msg.cmd === "state") {
+      loadPrefs().then(() =>
+        sendResponse({
+          watch: location.pathname === "/watch",
+          active: state.active,
+          preparing: state.preparing,
+          target: state.target || "en",
+          duck: state.prefs.ytDuck,
+          customLangs: state.prefs.customLangs,
+        })
+      );
+      return true; // async response
+    }
+    if (msg.cmd === "toggle") {
+      onToggle();
+      sendResponse({ ok: true });
+    } else if (msg.cmd === "lang") {
+      state.target = msg.code;
+      savePref({ ytTarget: msg.code });
+      if (state.active || state.preparing) restartDub();
+      sendResponse({ ok: true });
+    } else if (msg.cmd === "duck") {
+      state.prefs.ytDuck = Number(msg.value);
+      if (state.active) applyDuck();
+      if (msg.persist) savePref({ ytDuck: state.prefs.ytDuck });
+      const panelDuck = document.querySelector(`#${PANEL_ID} [data-vo="duck"]`);
+      if (panelDuck) {
+        panelDuck.value = state.prefs.ytDuck;
+        panelDuck.dispatchEvent(new Event("input"));
+      }
+      sendResponse({ ok: true });
+    }
+  });
+
   // ------------------------------------------------- SPA navigation glue
   document.addEventListener("yt-navigate-finish", () => {
     if (state.active || state.preparing) stopDub(null);

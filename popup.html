@@ -6,11 +6,16 @@
     <style>
       :root { color-scheme: light; }
       * { box-sizing: border-box; }
-      html { background: #f7f5ef; }
+      html { background: #e9e4d6; }
       body {
-        width: 340px; margin: 0; padding: 14px;
+        width: 340px; margin: 0; padding: 8px;
         font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        background: #f7f5ef; color: #2e2f2b;
+        background: #e9e4d6; color: #2e2f2b;
+      }
+      /* Rounded card inside the (square, Chrome-drawn) popup frame */
+      .card {
+        background: #f7f5ef; border: 1px solid #ded8c8; border-radius: 14px;
+        padding: 14px; box-shadow: 0 2px 10px rgba(60,55,40,.08);
       }
       h1 { font-size: 15px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
       h1 small { font-weight: 400; color: #8d897a; font-size: 11px; margin-left: auto; }
@@ -38,34 +43,59 @@
         padding: 8px 10px;
       }
       .text:empty { display: none; }
+      .yt { margin-top: 12px; padding-top: 12px; border-top: 1px solid #ded8c8; }
+      .yt.hidden { display: none; }
+      .yt-head { font-size: 12px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; }
+      .yt-head span { font-weight: 400; font-size: 11px; color: #8d897a; margin-left: auto; }
+      .duck { margin-bottom: 0; }
+      .duck label { font-size: 12px; color: #5a584e; white-space: nowrap; }
+      .duck input { flex: 1; accent-color: #44483d; }
+      .duck output { font-size: 11px; color: #8d897a; width: 34px; text-align: right; }
       footer { margin-top: 14px; display: flex; }
       footer a { color: #6b6a4a; font-size: 12px; text-decoration: none; margin-left: auto; cursor: pointer; }
     </style>
   </head>
   <body>
-    <h1><img class="logo" src="icons/icon48.png" alt="" /> VoiceOne <small>native AI translate & read</small></h1>
-    <p class="hint">Tip: right-click any selected text → <b>VoiceOne</b>. Or use the buttons below for the current selection.</p>
+    <div class="card">
+      <h1><img class="logo" src="icons/icon48.png" alt="" /> VoiceOne <small>native AI translate & read</small></h1>
+      <p class="hint">Tip: right-click any selected text → <b>VoiceOne</b>. Or use the buttons below for the current selection.</p>
 
-    <div class="row">
-      <select id="target" title="Target language"></select>
+      <div class="row">
+        <select id="target" title="Target language"></select>
+      </div>
+      <div class="row actions">
+        <button id="read">Read selection</button>
+        <button id="translate" class="primary">Translate &amp; read</button>
+      </div>
+
+      <div class="controls">
+        <button data-a="pause" title="Pause">⏸</button>
+        <button data-a="resume" title="Resume">▶</button>
+        <button data-a="repeat" title="Repeat">↻</button>
+        <button data-a="stop" title="Stop">⏹</button>
+        <button data-a="clear" title="Clear">Clear</button>
+      </div>
+
+      <div class="status" id="status"></div>
+      <div class="text" id="text"></div>
+
+      <div class="yt hidden" id="yt">
+        <div class="yt-head">🎓 YouTube dubbing <span id="ytStatus"></span></div>
+        <div class="row">
+          <select id="ytLang" title="Dub language"></select>
+        </div>
+        <div class="row">
+          <button id="ytToggle" class="primary" style="flex:1">Start dubbing</button>
+        </div>
+        <div class="row duck">
+          <label for="ytDuck">Original audio</label>
+          <input id="ytDuck" type="range" min="0" max="0.5" step="0.01" />
+          <output id="ytDuckOut"></output>
+        </div>
+      </div>
+
+      <footer><a id="settings">Settings ⚙</a></footer>
     </div>
-    <div class="row actions">
-      <button id="read">Read selection</button>
-      <button id="translate" class="primary">Translate &amp; read</button>
-    </div>
-
-    <div class="controls">
-      <button data-a="pause" title="Pause">⏸</button>
-      <button data-a="resume" title="Resume">▶</button>
-      <button data-a="repeat" title="Repeat">↻</button>
-      <button data-a="stop" title="Stop">⏹</button>
-      <button data-a="clear" title="Clear">Clear</button>
-    </div>
-
-    <div class="status" id="status"></div>
-    <div class="text" id="text"></div>
-
-    <footer><a id="settings">Settings ⚙</a></footer>
 
     <script type="module" src="popup.js"></script>
   </body>

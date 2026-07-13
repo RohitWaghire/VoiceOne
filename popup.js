@@ -51,3 +51,60 @@ chrome.runtime.onMessage.addListener((msg) => {
 
 // Initial state from the last mirrored view.
 chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voiceoneView));
+
+// ---------------------------------------------------------------------------
+// YouTube dubbing section — appears when the active tab is a watch page.
+// ---------------------------------------------------------------------------
+(async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !/youtube\.com\/watch/.test(tab.url || "")) return;
+
+  const sendYt = (cmd, extra = {}) =>
+    chrome.tabs.sendMessage(tab.id, { ns: "voiceone-yt", cmd, ...extra }).catch(() => null);
+
+  const sec = $("yt");
+  const st = await sendYt("state");
+  sec.classList.remove("hidden");
+
+  if (!st) {
+    // Content script from before the last extension update — it can't dub.
+    $("ytStatus").textContent = "reload the video tab to enable";
+    for (const el of ["ytLang", "ytToggle", "ytDuck"]) $(el).disabled = true;
+    return;
+  }
+
+  const toggleBtn = $("ytToggle");
+  const setToggle = (active, preparing) => {
+    toggleBtn.textContent = preparing ? "Starting…" : active ? "Stop dubbing" : "Start dubbing";
+    $("ytStatus").textContent = active ? "dubbing" : "";
+  };
+  setToggle(st.active, st.preparing);
+
+  const langSel = $("ytLang");
+  for (const lang of mergeLanguages(st.customLangs)) {
+    const opt = document.createElement("option");
+    opt.value = lang.code;
+    opt.textContent = "Dub into " + lang.label;
+    if (lang.code === st.target) opt.selected = true;
+    langSel.appendChild(opt);
+  }
+  langSel.addEventListener("change", () => sendYt("lang", { code: langSel.value }));
+
+  toggleBtn.addEventListener("click", async () => {
+    await sendYt("toggle");
+    if (!st.active) window.close(); // starting — get out of the way, panel appears on page
+    else setToggle(false, false);
+    st.active = !st.active;
+  });
+
+  const duck = $("ytDuck");
+  const duckOut = $("ytDuckOut");
+  const syncDuck = () => (duckOut.textContent = Math.round(duck.value * 100) + "%");
+  duck.value = st.duck;
+  syncDuck();
+  duck.addEventListener("input", () => {
+    syncDuck();
+    sendYt("duck", { value: Number(duck.value) });
+  });
+  duck.addEventListener("change", () => sendYt("duck", { value: Number(duck.value), persist: true }));
+})();
