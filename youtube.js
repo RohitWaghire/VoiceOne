@@ -31,6 +31,7 @@
     savedVolume: null,
     applyingDuck: false, // guards our own volume writes from onVolumeChange
     inAd: false,
+    inflight: 0, // utterances submitted to speechSynthesis but not finished
     voice: null,
     target: null, // dub language (base code, e.g. "en"); null until prefs load
     bcp47: "en-US",
@@ -390,7 +391,7 @@
     if (!track || !track.baseUrl)
       throw new Error("this video has no captions, so it can't be dubbed.");
 
-    const cues = await fetchCaption(track.baseUrl);
+    const cues = cap.mergeCues(await fetchCaption(track.baseUrl));
     if (superseded(myGen, startVideoId)) {
       if (state.gen === myGen) toast(null);
       return;
@@ -434,6 +435,7 @@
     clearInterval(state.timer);
     state.timer = null;
     window.speechSynthesis.cancel();
+    state.inflight = 0;
     if (state.video) {
       if (state.savedVolume !== null) {
         state.applyingDuck = true;
@@ -467,6 +469,7 @@
       if (!state.inAd) {
         state.inAd = true;
         window.speechSynthesis.cancel();
+        state.inflight = 0;
       }
       return;
     }
@@ -492,30 +495,42 @@
 
   function speak(cue, nowMs) {
     const synth = window.speechSynthesis;
-    // Keep sync over completeness: a lagging utterance yields to the next cue.
-    if (synth.speaking || synth.pending) synth.cancel();
+    // Let one utterance queue behind the current one — cancelling on every new
+    // cue chopped words mid-utterance (the stutter). Only when we fall 2+
+    // utterances behind do we drop the backlog and jump to stay in sync.
+    if (state.inflight >= 2) {
+      synth.cancel();
+      state.inflight = 0;
+    }
 
     const pbr = state.video.playbackRate || 1;
-    const availMs = Math.max((cue.end - nowMs) / pbr, 500);
+    const availMs = Math.max((cue.end - nowMs) / pbr, 600);
     const estMs = cue.text.length * MS_PER_CHAR;
     const needed = estMs / availMs;
-    const rate = Math.min(Math.max(state.prefs.rate, needed), 2.5);
+    // Cap at 2× — beyond that most voices garble, which reads as stutter too.
+    const rate = Math.min(Math.max(state.prefs.rate, needed), 2);
 
     const u = new SpeechSynthesisUtterance(cue.text);
     if (state.voice) u.voice = state.voice;
     u.lang = state.bcp47;
     u.rate = rate;
     u.volume = 1;
+    u.onend = u.onerror = () => {
+      state.inflight = Math.max(0, state.inflight - 1);
+    };
+    state.inflight++;
     synth.speak(u);
   }
 
   function onSeek() {
     window.speechSynthesis.cancel();
+    state.inflight = 0;
     if (!state.active || !state.video || !cap) return;
     state.idx = cap.findCueIndex(state.cues, state.video.currentTime * 1000);
   }
   function onPause() {
     window.speechSynthesis.cancel();
+    state.inflight = 0;
   }
   function onPlay() {
     if (!state.active || !state.video || !cap || isAdShowing()) return;
