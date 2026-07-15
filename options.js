@@ -150,7 +150,11 @@ async function load() {
 
 $("save").addEventListener("click", async () => {
   const menuLangs = checkedCodes();
+  // Merge over the stored object — other surfaces keep their own keys in it
+  // (e.g. ytTarget from the YouTube dub panel), which a wholesale write would wipe.
+  const { prefs: existing } = await chrome.storage.sync.get("prefs");
   const prefs = {
+    ...(existing || {}),
     rate: Number($("rate").value),
     pitch: Number($("pitch").value),
     volume: Number($("volume").value),

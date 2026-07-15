@@ -25,7 +25,16 @@ const textEl = $("text");
 
 $("read").addEventListener("click", () => send("read-selection"));
 $("translate").addEventListener("click", () => send("read-selection", { target: $("target").value }));
-$("settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
+// Resolved ahead of the click: sidePanel.open() needs a user gesture, so the
+// handler can't await anything before calling it.
+let panelWindowId = null;
+chrome.windows.getCurrent().then((w) => (panelWindowId = w.id)).catch(() => {});
+
+$("settings").addEventListener("click", () => {
+  if (panelWindowId === null) return chrome.runtime.openOptionsPage();
+  // Popup dismisses itself once the panel takes focus.
+  chrome.sidePanel.open({ windowId: panelWindowId }).catch(() => chrome.runtime.openOptionsPage());
+});
 
 document.querySelectorAll(".controls button[data-a]").forEach((btn) => {
   btn.addEventListener("click", () => send(btn.dataset.a));
