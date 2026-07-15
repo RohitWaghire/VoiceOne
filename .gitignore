@@ -13,3 +13,6 @@ desktop.ini
 *.log
 _preview*.html
 *.zip
+
+# Local AI-assistant guidance
+CLAUDE.md
