@@ -11,12 +11,11 @@ desktop.ini
 
 # Logs / scratch
 *.log
-_preview*.html
 *.zip
 
 # Local AI-assistant guidance
 CLAUDE.md
 
-# Local marketing/launch drafts
-_drafts*.md
-_test.vtt
+# Local scratch: drafts, test harnesses (Chrome refuses to Load-unpacked any
+# file starting with "_", so local files live in .local/ instead)
+.local/
