@@ -31,7 +31,8 @@
     {
       "resources": [
         "lib/captions.js",
-        "lib/languages.js"
+        "lib/languages.js",
+        "icons/icon48.png"
       ],
       "matches": [
         "https://www.youtube.com/*"

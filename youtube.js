@@ -206,13 +206,11 @@
     btn.className = "ytp-button";
     btn.title = "VoiceOne — dub this video";
     btn.setAttribute("aria-pressed", "false");
-    btn.innerHTML =
-      '<svg height="24" width="24" viewBox="0 0 24 24" style="pointer-events:none;display:block">' +
-      '<g fill="currentColor">' +
-      '<path d="M3 9v6h4l5 5V4L7 9H3z"/>' +
-      '<path d="M14.5 12A4.5 4.5 0 0 0 12 8v8a4.5 4.5 0 0 0 2.5-4z"/>' +
-      '<path d="M12 2.06v2.06c3.39.49 6 3.39 6 6.88s-2.61 6.39-6 6.88v2.06c4.5-.51 8-4.31 8-8.94s-3.5-8.43-8-8.94z"/>' +
-      "</g></svg>";
+    const logo = document.createElement("img");
+    logo.src = chrome.runtime.getURL("icons/icon48.png");
+    logo.alt = "";
+    logo.style.cssText = "width:24px;height:24px;pointer-events:none;display:block;border-radius:5px;";
+    btn.appendChild(logo);
     btn.style.cssText =
       "width:48px;height:100%;padding:0;opacity:0.9;display:inline-flex;align-items:center;justify-content:center;vertical-align:top;";
     btn.addEventListener("click", onToggle);
@@ -223,8 +221,10 @@
     const btn = document.getElementById(BTN_ID);
     if (!btn) return;
     btn.setAttribute("aria-pressed", String(mode === "on"));
-    btn.style.color = mode === "on" ? "#3ea6ff" : "";
-    btn.style.opacity = mode === "loading" ? "0.5" : "0.9";
+    // The logo is an <img>, so signal "on" with a glow instead of a color tint.
+    const logo = btn.querySelector("img");
+    if (logo) logo.style.filter = mode === "on" ? "drop-shadow(0 0 5px #3ea6ff)" : "";
+    btn.style.opacity = mode === "loading" ? "0.5" : mode === "on" ? "1" : "0.9";
   }
 
   // ------------------------------------------------------------ volume duck
