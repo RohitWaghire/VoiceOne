@@ -28,6 +28,9 @@
       select { flex: 1; }
       .logo { width: 20px; height: 20px; border-radius: 5px; vertical-align: middle; }
       button:hover { background: #ddd7c6; }
+      button:disabled { opacity: .5; cursor: default; }
+      button:disabled:hover { background: #e7e2d4; }
+      button.primary:disabled:hover { background: #44483d; }
       button.primary { background: #44483d; border-color: #44483d; color: #f7f5ef; font-weight: 600; }
       button.primary:hover { background: #565a4c; }
       .actions { gap: 8px; }

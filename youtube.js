@@ -14,6 +14,10 @@
 
   const BTN_ID = "voiceone-dub-btn";
 
+  // A predecessor script orphaned by an extension reload leaves its dead
+  // button in the DOM; remove it so ensureButton rebuilds a live one.
+  document.getElementById(BTN_ID)?.remove();
+
   let cap = null; // lib/captions.js exports
 
   // After an extension update/reload, scripts already injected into open tabs

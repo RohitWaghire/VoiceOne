@@ -88,12 +88,31 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
     sec.classList.remove("hidden");
     $("ytEnableRow").classList.add("hidden");
     $("ytControls").classList.remove("hidden");
-    const st = await sendYt("state");
+    let st = await sendYt("state");
 
     if (!st) {
-      // Content script from before the last extension update / site enablement.
-      $("ytStatus").textContent = "reload the video tab to enable";
-      for (const el of ["ytLang", "ytToggle", "ytDuck"]) $(el).disabled = true;
+      // No script in the tab — it predates the extension load, or an extension
+      // reload orphaned it. The open popup holds activeTab, so inject now.
+      await chrome.scripting
+        .executeScript({
+          target: { tabId: tab.id },
+          files: [isYouTube ? "youtube.js" : "sites/generic.js"],
+        })
+        .catch(() => {});
+      st = await sendYt("state");
+    }
+
+    if (!st) {
+      // Injection still couldn't reach it — hand the user a one-click fix.
+      $("ytStatus").textContent = "tab needs a reload";
+      $("ytLang").disabled = true;
+      $("ytDuck").disabled = true;
+      const btn = $("ytToggle");
+      btn.textContent = "Reload video tab";
+      btn.addEventListener("click", () => {
+        chrome.tabs.reload(tab.id);
+        window.close();
+      });
       return;
     }
 
