@@ -117,12 +117,11 @@
     setInterval(() => {
       const id = dmShellVideoId();
       if (!id) return;
-      for (const f of document.querySelectorAll("iframe")) {
-        try {
-          f.contentWindow?.postMessage({ type: DM_ANSWER, id }, "https://geo.dailymotion.com");
-        } catch {
-          /* non-player iframe */
-        }
+      // Only target actual player frames — posting to the page's same-origin
+      // iframes with a geo target doesn't throw, it async-logs an origin
+      // mismatch error that try/catch can't suppress.
+      for (const f of document.querySelectorAll('iframe[src^="https://geo.dailymotion.com/"]')) {
+        f.contentWindow?.postMessage({ type: DM_ANSWER, id }, "https://geo.dailymotion.com");
       }
     }, 1500);
   }
