@@ -301,13 +301,16 @@ function setView(tabId, patch) {
 // → site access), drop the orphaned registration here.
 // ---------------------------------------------------------------------------
 chrome.permissions.onRemoved.addListener(async (removed) => {
-  const gone = new Set(
-    (removed.origins || []).map((o) => "voiceone-dub:" + o)
-  );
+  const gone = new Set(removed.origins || []);
   if (!gone.size) return;
   try {
     const regs = await chrome.scripting.getRegisteredContentScripts();
-    const ids = regs.map((r) => r.id).filter((id) => gone.has(id));
+    // Match by the patterns a registration runs on, not just its id — a
+    // multi-origin site (e.g. Dailymotion + its player frame origin) must be
+    // torn down when the user revokes any of its origins.
+    const ids = regs
+      .filter((r) => r.id.startsWith("voiceone-dub:") && r.matches?.some((m) => gone.has(m)))
+      .map((r) => r.id);
     if (ids.length) await chrome.scripting.unregisterContentScripts({ ids });
   } catch (err) {
     console.warn("[VoiceOne] site-script cleanup failed:", err);

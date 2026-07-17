@@ -80,6 +80,18 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
   if (isYouTube && !url.pathname.startsWith("/watch")) return; // home/feed pages
   const originPattern = url.origin + "/*";
 
+  // Sites whose player lives in a cross-origin iframe need that origin granted
+  // too, and the content script registered in every frame.
+  const SITE_EXTRAS = {
+    "dailymotion.com": {
+      origins: ["https://www.dailymotion.com/*", "https://geo.dailymotion.com/*"],
+      allFrames: true,
+    },
+  };
+  const extras = SITE_EXTRAS[url.hostname.replace(/^www\./, "")];
+  const origins = extras?.origins || [originPattern];
+  const allFrames = !!extras?.allFrames;
+
   const sec = $("yt");
   const sendYt = (cmd, extra = {}) =>
     chrome.tabs.sendMessage(tab.id, { ns: "voiceone-yt", cmd, ...extra }).catch(() => null);
@@ -158,7 +170,7 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
 
   const enabled =
     isYouTube ||
-    (await chrome.permissions.contains({ origins: [originPattern] }).catch(() => false));
+    (await chrome.permissions.contains({ origins }).catch(() => false));
 
   if (enabled) {
     if (!isYouTube) {
@@ -166,7 +178,7 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
       // document_idle on future loads) — inject now; the script's own guard
       // makes this a no-op when it's already there.
       await chrome.scripting
-        .executeScript({ target: { tabId: tab.id }, files: ["sites/generic.js"] })
+        .executeScript({ target: { tabId: tab.id, allFrames }, files: ["sites/generic.js"] })
         .catch(() => {});
     }
     return initControls();
@@ -177,17 +189,16 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
   $("ytControls").classList.add("hidden");
   $("ytEnableRow").classList.remove("hidden");
   $("ytEnable").addEventListener("click", async () => {
-    const ok = await chrome.permissions
-      .request({ origins: [originPattern] })
-      .catch(() => false);
+    const ok = await chrome.permissions.request({ origins }).catch(() => false);
     if (!ok) return; // user declined Chrome's prompt
     try {
       await chrome.scripting.registerContentScripts([
         {
           id: "voiceone-dub:" + originPattern,
-          matches: [originPattern],
+          matches: origins,
           js: ["sites/generic.js"],
           runAt: "document_idle",
+          allFrames,
           persistAcrossSessions: true,
         },
       ]);
@@ -201,7 +212,7 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
       }
     }
     await chrome.scripting
-      .executeScript({ target: { tabId: tab.id }, files: ["sites/generic.js"] })
+      .executeScript({ target: { tabId: tab.id, allFrames }, files: ["sites/generic.js"] })
       .catch(() => {});
     initControls();
   });

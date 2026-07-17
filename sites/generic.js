@@ -48,6 +48,94 @@
   let cap = null; // lib/captions.js exports
   let flippedTrack = null; // track we switched disabled → hidden; restore on stop
 
+  // ------------------------------------------------- site-specific getCues
+  // Sites that hide captions behind their own APIs instead of HTML5 tracks.
+  // Each returns { cues, sourceLang } like the base adapter, throwing
+  // user-facing errors. Everything else (video lookup, ducking, panel) stays
+  // shared. Spike findings per site are noted inline — they're load-bearing.
+
+  const langBase = (l) => String(l || "").toLowerCase().replace(/^ai-/, "").split("-")[0];
+  const pickByLang = (list, getLang, target) =>
+    list.find((t) => langBase(getLang(t)) === String(target).toLowerCase()) || list[0];
+
+  // Vimeo: player config JSON lists per-language VTT tracks; both the config
+  // and captions.vimeo.com are CORS-open from vimeo.com (verified live).
+  async function vimeoGetCues(target, isSuperseded) {
+    const m = location.pathname.match(/\/(\d{6,})/);
+    if (!m) throw new Error("open a Vimeo video page to dub.");
+    const cfg = await (await fetch(`https://player.vimeo.com/video/${m[1]}/config`)).json();
+    if (isSuperseded()) return null;
+    const tracks = cfg?.request?.text_tracks || [];
+    if (!tracks.length) throw new Error("this video has no captions, so it can't be dubbed.");
+    const track = pickByLang(tracks, (t) => t.lang, target);
+    const url = track.url.startsWith("http") ? track.url : "https://player.vimeo.com" + track.url;
+    const cues = cap.mergeCues(cap.parseVttOrSrt(await (await fetch(url)).text()));
+    if (isSuperseded()) return null;
+    if (!cues.length) throw new Error("couldn't read this video's captions — try reloading the page.");
+    return { cues, sourceLang: langBase(track.lang) || target };
+  }
+
+  // Dailymotion: the player lives in a cross-origin geo.dailymotion.com
+  // iframe, so THIS SCRIPT RUNS INSIDE THAT FRAME (registered allFrames with
+  // both origins). The frame's ?video= param names the video, and the
+  // www.dailymotion.com metadata endpoint is CORS-open from the frame
+  // (verified live). Subtitle files are SRT on their CDN, CORS-open.
+  async function dailymotionGetCues(target, isSuperseded) {
+    const id = new URLSearchParams(location.search).get("video");
+    if (!id) throw new Error("couldn't identify the Dailymotion video in this player.");
+    const meta = await (
+      await fetch("https://www.dailymotion.com/player/metadata/video/" + id)
+    ).json();
+    if (isSuperseded()) return null;
+    const subs = meta?.subtitles?.data || {};
+    const langs = Object.keys(subs);
+    if (!langs.length) throw new Error("this video has no captions, so it can't be dubbed.");
+    const lang = pickByLang(langs, (l) => l, target);
+    const url = subs[lang]?.urls?.[0];
+    if (!url) throw new Error("this video's captions couldn't be located.");
+    const cues = cap.mergeCues(cap.parseVttOrSrt(await (await fetch(url)).text()));
+    if (isSuperseded()) return null;
+    if (!cues.length) throw new Error("couldn't read this video's captions — try reloading the page.");
+    return { cues, sourceLang: langBase(lang) || target };
+  }
+
+  // Bilibili: view API resolves bvid → cid, player API lists CC subtitle
+  // JSON. Uses the tab's own session (subtitle URLs are login-gated for many
+  // videos); "ai-" prefixed lan codes are Bilibili's auto-generated tracks.
+  async function bilibiliGetCues(target, isSuperseded) {
+    const m = location.pathname.match(/\/video\/(BV[0-9A-Za-z]+)/);
+    if (!m) throw new Error("open a Bilibili video page to dub.");
+    const bvid = m[1];
+    const view = await (
+      await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, { credentials: "include" })
+    ).json();
+    const cid = view?.data?.cid;
+    if (!cid) throw new Error("couldn't load this Bilibili video's details.");
+    const player = await (
+      await fetch(`https://api.bilibili.com/x/player/v2?bvid=${bvid}&cid=${cid}`, { credentials: "include" })
+    ).json();
+    if (isSuperseded()) return null;
+    const subs = player?.data?.subtitle?.subtitles || [];
+    if (!subs.length)
+      throw new Error("no subtitles on this video (Bilibili often requires being logged in to see them).");
+    const sub = pickByLang(subs, (s) => s.lan, target);
+    let url = sub.subtitle_url || "";
+    if (url.startsWith("//")) url = "https:" + url;
+    if (!url) throw new Error("this video's subtitles couldn't be located — try logging into Bilibili.");
+    const cues = cap.mergeCues(cap.parseBilibiliSubtitle(await (await fetch(url)).json()));
+    if (isSuperseded()) return null;
+    if (!cues.length) throw new Error("couldn't read this video's subtitles — try reloading the page.");
+    return { cues, sourceLang: langBase(sub.lan) || target };
+  }
+
+  function siteGetCues() {
+    const h = location.hostname;
+    if (h === "geo.dailymotion.com" || /(^|\.)dailymotion\.com$/.test(h)) return dailymotionGetCues;
+    if (/(^|\.)vimeo\.com$/.test(h)) return vimeoGetCues;
+    if (/(^|\.)bilibili\.com$/.test(h)) return bilibiliGetCues;
+    return null; // unknown site → base adapter reads HTML5 textTracks
+  }
+
   const adapter = {
     getVideo,
     // SPA sites change the URL per video; same-URL video swaps are out of scope.
@@ -62,6 +150,8 @@
       }
     },
     async getCues(target, isSuperseded) {
+      const impl = siteGetCues();
+      if (impl) return impl(target, isSuperseded);
       const video = getVideo();
       if (!video) throw new Error("no video player found on this page.");
       const tracks = [...(video.textTracks || [])].filter((t) =>
@@ -128,6 +218,10 @@
   // synchronously at injection; handlers await the engine.
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg?.ns !== "voiceone-yt") return;
+    // On allFrames sites (e.g. Dailymotion) this script runs in every frame,
+    // and tabs.sendMessage reaches all of them — only the frame that actually
+    // holds the video answers, so the popup talks to the right one.
+    if (!getVideo()) return;
     (async () => {
       const engine = await bootPromise;
       if (msg.cmd === "state") {
