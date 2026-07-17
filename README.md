@@ -11,6 +11,13 @@ AI**; works on regular web pages and inside Chrome's built-in PDF viewer.
 
 **▶ [Install from the Chrome Web Store](https://chromewebstore.google.com/detail/voiceone/ingbabpokfkldjjpbgjkmfichemjagii)**
 
+<!-- hero demo GIF — record ~15s: open a captioned lecture → click the VoiceOne
+     button → audio ducks, narration starts → switch language in the dub panel.
+     Save as screenshots/dub-demo.gif, then uncomment:
+![One-click YouTube dubbing](screenshots/dub-demo.gif)
+-->
+
+
 Everything runs locally in the browser:
 
 - **Translation** → built-in **`Translator`** + **`LanguageDetector`** APIs
@@ -98,7 +105,7 @@ means:
 **YouTube dubbing:**
 
 1. Open any YouTube video with captions (most lectures have auto-captions).
-2. Click the **speaker button** in the player's bottom-right controls.
+2. Click the **VoiceOne logo button** in the player's bottom-right controls.
 3. The lecturer's audio ducks down and a clear voice narrates in sync. Videos in another language
    show a brief on-device "Translating… %" pass first.
 4. Use the **VoiceOne dub panel** (bottom-left) to switch the dub language live, adjust how loud
@@ -117,7 +124,8 @@ language, control playback, or open **Settings**.
 | `manifest.json` | MV3 manifest, permissions, menu |
 | `background.js` | Service worker: menus, detection, translation, `chrome.tts`, panel state |
 | `panel.js` | Floating control panel injected into the page (Shadow DOM) |
-| `youtube.js` | YouTube content script: dub button, control panel, caption fetch, synced narration |
+| `youtube.js` | YouTube site adapter: dub button, caption fetch, ad detection, SPA-navigation glue |
+| `lib/dub-engine.js` | Site-agnostic dub engine: synced narration, audio duck, dub panel, translation batching |
 | `popup.html` / `popup.js` | Toolbar popup + fallback controls |
 | `options.html` / `options.js` | Preferences (`chrome.storage.sync`) |
 | `lib/languages.js` | Language list + TTS hints |
@@ -138,6 +146,15 @@ language, control playback, or open **Settings**.
   YouTube tabs that were already open keep the old script; refresh the tab once.
 - **"couldn't load captions"** — YouTube occasionally gates caption requests; reload the page and
   try again, or try another video.
+
+---
+
+## Roadmap
+
+- **Dubbing beyond YouTube** — the dub engine is now site-agnostic; adapters for more
+  lecture/video platforms are in progress, enabled per-site so the extension never asks for
+  broad permissions up front.
+- Better voices, per-language voice preferences.
 
 ---
 
