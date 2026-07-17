@@ -16,3 +16,6 @@ _preview*.html
 
 # Local AI-assistant guidance
 CLAUDE.md
+
+# Local marketing/launch drafts
+_drafts*.md
