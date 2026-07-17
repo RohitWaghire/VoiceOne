@@ -293,7 +293,9 @@ function setView(tabId, patch) {
 // ---------------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.ns !== "voiceone" || !msg.from) return;
-  if (msg.action === "yt-translate") {
+  // "yt-translate" is the pre-1.3 name — content scripts orphaned by an
+  // extension update may still send it.
+  if (msg.action === "dub-translate" || msg.action === "yt-translate") {
     ytTranslate(msg)
       .then(sendResponse)
       .catch((err) => sendResponse({ ok: false, error: err.message }));

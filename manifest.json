@@ -32,6 +32,7 @@
       "resources": [
         "lib/captions.js",
         "lib/languages.js",
+        "lib/dub-engine.js",
         "icons/icon48.png"
       ],
       "matches": [
