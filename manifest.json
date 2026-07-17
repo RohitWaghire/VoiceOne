@@ -12,6 +12,9 @@
     "storage",
     "sidePanel"
   ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -36,7 +39,7 @@
         "icons/icon48.png"
       ],
       "matches": [
-        "https://www.youtube.com/*"
+        "<all_urls>"
       ],
       "use_dynamic_url": true
     }

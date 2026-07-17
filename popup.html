@@ -44,7 +44,7 @@
       }
       .text:empty { display: none; }
       .yt { margin-top: 12px; padding-top: 12px; border-top: 1px solid #ded8c8; }
-      .yt.hidden { display: none; }
+      .hidden { display: none !important; }
       .yt-head { font-size: 12px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; }
       .yt-head span { font-weight: 400; font-size: 11px; color: #8d897a; margin-left: auto; }
       .duck { margin-bottom: 0; }
@@ -80,17 +80,22 @@
       <div class="text" id="text"></div>
 
       <div class="yt hidden" id="yt">
-        <div class="yt-head">🎓 YouTube dubbing <span id="ytStatus"></span></div>
-        <div class="row">
-          <select id="ytLang" title="Dub language"></select>
+        <div class="yt-head">🎓 Video dubbing <span id="ytStatus"></span></div>
+        <div class="row hidden" id="ytEnableRow">
+          <button id="ytEnable" class="primary" style="flex:1">Enable dubbing on this site</button>
         </div>
-        <div class="row">
-          <button id="ytToggle" class="primary" style="flex:1">Start dubbing</button>
-        </div>
-        <div class="row duck">
-          <label for="ytDuck">Original audio</label>
-          <input id="ytDuck" type="range" min="0" max="0.5" step="0.01" />
-          <output id="ytDuckOut"></output>
+        <div id="ytControls">
+          <div class="row">
+            <select id="ytLang" title="Dub language"></select>
+          </div>
+          <div class="row">
+            <button id="ytToggle" class="primary" style="flex:1">Start dubbing</button>
+          </div>
+          <div class="row duck">
+            <label for="ytDuck">Original audio</label>
+            <input id="ytDuck" type="range" min="0" max="0.5" step="0.01" />
+            <output id="ytDuckOut"></output>
+          </div>
         </div>
       </div>
 

@@ -62,60 +62,117 @@ chrome.runtime.onMessage.addListener((msg) => {
 chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voiceoneView));
 
 // ---------------------------------------------------------------------------
-// YouTube dubbing section — appears when the active tab is a watch page.
+// Video dubbing section. YouTube has a declared content script; any other
+// https site can be enabled at runtime — chrome.permissions.request needs the
+// click's user gesture, so the whole grant→register flow lives here.
 // ---------------------------------------------------------------------------
 (async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  // Only where our content script actually runs (www.youtube.com watch pages).
-  if (!tab?.id || !/^https:\/\/www\.youtube\.com\/watch/.test(tab.url || "")) return;
+  if (!tab?.id) return;
+  let url;
+  try {
+    url = new URL(tab.url || "");
+  } catch {
+    return;
+  }
+  if (url.protocol !== "https:") return; // no dubbing on chrome://, file:// etc.
+  const isYouTube = url.hostname === "www.youtube.com";
+  if (isYouTube && !url.pathname.startsWith("/watch")) return; // home/feed pages
+  const originPattern = url.origin + "/*";
 
+  const sec = $("yt");
   const sendYt = (cmd, extra = {}) =>
     chrome.tabs.sendMessage(tab.id, { ns: "voiceone-yt", cmd, ...extra }).catch(() => null);
 
-  const sec = $("yt");
-  const st = await sendYt("state");
-  sec.classList.remove("hidden");
+  async function initControls() {
+    sec.classList.remove("hidden");
+    $("ytEnableRow").classList.add("hidden");
+    $("ytControls").classList.remove("hidden");
+    const st = await sendYt("state");
 
-  if (!st) {
-    // Content script from before the last extension update — it can't dub.
-    $("ytStatus").textContent = "reload the video tab to enable";
-    for (const el of ["ytLang", "ytToggle", "ytDuck"]) $(el).disabled = true;
-    return;
-  }
+    if (!st) {
+      // Content script from before the last extension update / site enablement.
+      $("ytStatus").textContent = "reload the video tab to enable";
+      for (const el of ["ytLang", "ytToggle", "ytDuck"]) $(el).disabled = true;
+      return;
+    }
 
-  const toggleBtn = $("ytToggle");
-  const setToggle = (active, preparing) => {
-    toggleBtn.textContent = preparing ? "Starting…" : active ? "Stop dubbing" : "Start dubbing";
-    toggleBtn.disabled = !!preparing; // a click mid-prep would no-op yet flip the label
-    $("ytStatus").textContent = active ? "dubbing" : "";
-  };
-  setToggle(st.active, st.preparing);
+    const toggleBtn = $("ytToggle");
+    const setToggle = (active, preparing) => {
+      toggleBtn.textContent = preparing ? "Starting…" : active ? "Stop dubbing" : "Start dubbing";
+      toggleBtn.disabled = !!preparing; // a click mid-prep would no-op yet flip the label
+      $("ytStatus").textContent = active ? "dubbing" : "";
+    };
+    setToggle(st.active, st.preparing);
 
-  const langSel = $("ytLang");
-  for (const lang of mergeLanguages(st.customLangs)) {
-    const opt = document.createElement("option");
-    opt.value = lang.code;
-    opt.textContent = "Dub into " + lang.label;
-    if (lang.code === st.target) opt.selected = true;
-    langSel.appendChild(opt);
-  }
-  langSel.addEventListener("change", () => sendYt("lang", { code: langSel.value }));
+    const langSel = $("ytLang");
+    for (const lang of mergeLanguages(st.customLangs)) {
+      const opt = document.createElement("option");
+      opt.value = lang.code;
+      opt.textContent = "Dub into " + lang.label;
+      if (lang.code === st.target) opt.selected = true;
+      langSel.appendChild(opt);
+    }
+    langSel.addEventListener("change", () => sendYt("lang", { code: langSel.value }));
 
-  toggleBtn.addEventListener("click", async () => {
-    await sendYt("toggle");
-    if (!st.active) window.close(); // starting — get out of the way, panel appears on page
-    else setToggle(false, false);
-    st.active = !st.active;
-  });
+    toggleBtn.addEventListener("click", async () => {
+      await sendYt("toggle");
+      if (!st.active) window.close(); // starting — get out of the way, panel appears on page
+      else setToggle(false, false);
+      st.active = !st.active;
+    });
 
-  const duck = $("ytDuck");
-  const duckOut = $("ytDuckOut");
-  const syncDuck = () => (duckOut.textContent = Math.round(duck.value * 100) + "%");
-  duck.value = st.duck;
-  syncDuck();
-  duck.addEventListener("input", () => {
+    const duck = $("ytDuck");
+    const duckOut = $("ytDuckOut");
+    const syncDuck = () => (duckOut.textContent = Math.round(duck.value * 100) + "%");
+    duck.value = st.duck;
     syncDuck();
-    sendYt("duck", { value: Number(duck.value) });
+    duck.addEventListener("input", () => {
+      syncDuck();
+      sendYt("duck", { value: Number(duck.value) });
+    });
+    duck.addEventListener("change", () => sendYt("duck", { value: Number(duck.value), persist: true }));
+  }
+
+  const enabled =
+    isYouTube ||
+    (await chrome.permissions.contains({ origins: [originPattern] }).catch(() => false));
+
+  if (enabled) {
+    if (!isYouTube) {
+      // The page may predate the site's enablement (or registration runs at
+      // document_idle on future loads) — inject now; the script's own guard
+      // makes this a no-op when it's already there.
+      await chrome.scripting
+        .executeScript({ target: { tabId: tab.id }, files: ["sites/generic.js"] })
+        .catch(() => {});
+    }
+    return initControls();
+  }
+
+  // Not enabled yet: offer the one-click grant.
+  sec.classList.remove("hidden");
+  $("ytControls").classList.add("hidden");
+  $("ytEnableRow").classList.remove("hidden");
+  $("ytEnable").addEventListener("click", async () => {
+    const ok = await chrome.permissions
+      .request({ origins: [originPattern] })
+      .catch(() => false);
+    if (!ok) return; // user declined Chrome's prompt
+    await chrome.scripting
+      .registerContentScripts([
+        {
+          id: "voiceone-dub:" + originPattern,
+          matches: [originPattern],
+          js: ["sites/generic.js"],
+          runAt: "document_idle",
+          persistAcrossSessions: true,
+        },
+      ])
+      .catch(() => {}); // already registered from an earlier grant → fine
+    await chrome.scripting
+      .executeScript({ target: { tabId: tab.id }, files: ["sites/generic.js"] })
+      .catch(() => {});
+    initControls();
   });
-  duck.addEventListener("change", () => sendYt("duck", { value: Number(duck.value), persist: true }));
 })();

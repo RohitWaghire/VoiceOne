@@ -289,6 +289,26 @@ function setView(tabId, patch) {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-site dubbing: keep registered content scripts in lockstep with grants.
+// The popup registers "voiceone-dub:<originPattern>" scripts after a
+// permissions.request; if the user later revokes a site (chrome://extensions
+// → site access), drop the orphaned registration here.
+// ---------------------------------------------------------------------------
+chrome.permissions.onRemoved.addListener(async (removed) => {
+  const gone = new Set(
+    (removed.origins || []).map((o) => "voiceone-dub:" + o)
+  );
+  if (!gone.size) return;
+  try {
+    const regs = await chrome.scripting.getRegisteredContentScripts();
+    const ids = regs.map((r) => r.id).filter((id) => gone.has(id));
+    if (ids.length) await chrome.scripting.unregisterContentScripts({ ids });
+  } catch (err) {
+    console.warn("[VoiceOne] site-script cleanup failed:", err);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Message routing (panel + popup controls)
 // ---------------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
