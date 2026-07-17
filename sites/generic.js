@@ -92,11 +92,72 @@
 
   // Dailymotion: the player lives in a cross-origin geo.dailymotion.com
   // iframe, so THIS SCRIPT RUNS INSIDE THAT FRAME (registered allFrames with
-  // both origins). The frame's ?video= param names the video, and the
-  // www.dailymotion.com metadata endpoint is CORS-open from the frame
-  // (verified live). Subtitle files are SRT on their CDN, CORS-open.
+  // both origins). The page hands the video id to the player via postMessage
+  // — the frame's own URL carries nothing (verified live) — so the two
+  // instances of this script bridge it: the player frame asks, and the
+  // www.dailymotion.com instance answers from its /video/<id> pathname. The
+  // www metadata endpoint is CORS-open from the frame; subtitles are SRT.
+  const DM_ASK = "voiceone-dm-videoid?";
+  const DM_ANSWER = "voiceone-dm-videoid";
+  const isDmShell =
+    /(^|\.)dailymotion\.com$/.test(location.hostname) &&
+    location.hostname !== "geo.dailymotion.com";
+  const isDmPlayer = location.hostname === "geo.dailymotion.com";
+
+  const dmShellVideoId = () =>
+    (location.pathname.match(/\/video\/([a-zA-Z0-9]+)/) || [])[1] || null;
+  if (isDmShell) {
+    // Answer the player frame's ask, and keep pushing the current id so the
+    // player instance notices SPA navigation (its own URL never changes).
+    window.addEventListener("message", (e) => {
+      if (e.data !== DM_ASK || e.origin !== "https://geo.dailymotion.com") return;
+      const id = dmShellVideoId();
+      if (id) e.source?.postMessage({ type: DM_ANSWER, id }, e.origin);
+    });
+    setInterval(() => {
+      const id = dmShellVideoId();
+      if (!id) return;
+      for (const f of document.querySelectorAll("iframe")) {
+        try {
+          f.contentWindow?.postMessage({ type: DM_ANSWER, id }, "https://geo.dailymotion.com");
+        } catch {
+          /* non-player iframe */
+        }
+      }
+    }, 1500);
+  }
+
+  let dmId = null; // player frame: current video id, kept fresh by shell pushes
+  if (isDmPlayer) {
+    window.addEventListener("message", (e) => {
+      if (e.origin !== "https://www.dailymotion.com" || e.data?.type !== DM_ANSWER) return;
+      if (e.data.id) dmId = e.data.id;
+    });
+  }
+  function askPageForDmId() {
+    if (dmId) return Promise.resolve(dmId);
+    return new Promise((resolve) => {
+      const t = setTimeout(() => resolve(dmId), 1200); // pushes may land meanwhile
+      const check = setInterval(() => {
+        if (dmId) {
+          clearTimeout(t);
+          clearInterval(check);
+          resolve(dmId);
+        }
+      }, 100);
+      setTimeout(() => clearInterval(check), 1300);
+      try {
+        window.parent.postMessage(DM_ASK, "https://www.dailymotion.com");
+      } catch {
+        /* resolved by the timeout */
+      }
+    });
+  }
+
   async function dailymotionGetCues(target, isSuperseded) {
-    const id = new URLSearchParams(location.search).get("video");
+    let id = new URLSearchParams(location.search).get("video");
+    if (!id) id = await askPageForDmId();
+    if (isSuperseded()) return null;
     if (!id) throw new Error("couldn't identify the Dailymotion video in this player.");
     const meta = await (
       await fetch("https://www.dailymotion.com/player/metadata/video/" + id)
@@ -153,8 +214,11 @@
 
   const adapter = {
     getVideo,
-    // SPA sites change the URL per video; same-URL video swaps are out of scope.
-    videoKey: () => location.pathname + location.search,
+    // SPA sites change the URL per video; same-URL video swaps are out of
+    // scope — except Dailymotion's player frame, whose URL never changes:
+    // there the shell-pushed video id is the identity.
+    videoKey: () =>
+      isDmPlayer && dmId ? dmId : location.pathname + location.search,
     isAdShowing: () => false,
     // No on-page button; the popup reflects state via snapshots. Used here to
     // put a track we enabled back the way the site had it.
@@ -235,8 +299,10 @@
     if (msg?.ns !== "voiceone-yt") return;
     // On allFrames sites (e.g. Dailymotion) this script runs in every frame,
     // and tabs.sendMessage reaches all of them — only the frame that actually
-    // holds the video answers, so the popup talks to the right one.
-    if (!getVideo()) return;
+    // holds the video answers, so the popup talks to the right one. The
+    // Dailymotion shell page never answers: its hover-previews are <video>
+    // elements too, but the real player always lives in the geo frame.
+    if (isDmShell || !getVideo()) return;
     (async () => {
       const engine = await bootPromise;
       if (msg.cmd === "state") {
