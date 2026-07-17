@@ -98,10 +98,18 @@
   };
 
   // Engine + libs load once at injection; context is guaranteed alive here.
+  // The engine is a leaf module (see its header) — we import its dependencies
+  // and hand the helpers in.
   const bootPromise = (async () => {
     cap = await import(chrome.runtime.getURL("lib/captions.js"));
+    const langs = await import(chrome.runtime.getURL("lib/languages.js"));
     const { createDubEngine } = await import(chrome.runtime.getURL("lib/dub-engine.js"));
-    return createDubEngine(adapter);
+    return createDubEngine(adapter, {
+      findCueIndex: cap.findCueIndex,
+      bcp47For: langs.bcp47For,
+      labelFor: langs.labelFor,
+      mergeLanguages: langs.mergeLanguages,
+    });
   })();
   bootPromise.catch((err) => console.warn("[VoiceOne] engine failed to load:", err));
 
