@@ -60,10 +60,25 @@
 
   // Vimeo: player config JSON lists per-language VTT tracks; both the config
   // and captions.vimeo.com are CORS-open from vimeo.com (verified live).
+  // The video id comes from the canonical link — the page URL itself can be a
+  // slug/profile layout with unrelated digits in it, and canonical also
+  // carries the /hash segment unlisted videos need (?h= on the config).
   async function vimeoGetCues(target, isSuperseded) {
-    const m = location.pathname.match(/\/(\d{6,})/);
+    const canonical = document.querySelector('link[rel="canonical"]')?.href || "";
+    const og = document.querySelector('meta[property="og:url"]')?.content || "";
+    const m =
+      canonical.match(/vimeo\.com\/(?:[^/]+\/)*?(\d{6,})(?:\/([0-9a-f]+))?/) ||
+      og.match(/vimeo\.com\/(?:[^/]+\/)*?(\d{6,})(?:\/([0-9a-f]+))?/) ||
+      location.pathname.match(/^\/(\d{6,})(?:\/([0-9a-f]+))?/);
     if (!m) throw new Error("open a Vimeo video page to dub.");
-    const cfg = await (await fetch(`https://player.vimeo.com/video/${m[1]}/config`)).json();
+    const cfgUrl =
+      `https://player.vimeo.com/video/${m[1]}/config` + (m[2] ? `?h=${m[2]}` : "");
+    let cfg;
+    try {
+      cfg = await (await fetch(cfgUrl, { credentials: "include" })).json();
+    } catch {
+      throw new Error("couldn't read this video's player data — it may be private or region-locked.");
+    }
     if (isSuperseded()) return null;
     const tracks = cfg?.request?.text_tracks || [];
     if (!tracks.length) throw new Error("this video has no captions, so it can't be dubbed.");
