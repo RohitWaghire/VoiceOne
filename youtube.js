@@ -20,16 +20,6 @@
 
   let cap = null; // lib/captions.js exports
 
-  // After an extension update/reload, scripts already injected into open tabs
-  // are orphaned: chrome.runtime disappears and every extension API throws.
-  const contextAlive = () => {
-    try {
-      return !!chrome.runtime?.id;
-    } catch {
-      return false;
-    }
-  };
-
   const currentVideoId = () =>
     new URLSearchParams(location.search).get("v") || null;
 
@@ -173,8 +163,9 @@
     btn.appendChild(logo);
     btn.style.cssText =
       "width:48px;height:100%;padding:0;opacity:0.9;display:inline-flex;align-items:center;justify-content:center;vertical-align:top;";
+    // engine.toggle() handles the orphaned-context case itself (its toast is
+    // pure DOM, so it still shows "reload this page" after an extension update).
     btn.addEventListener("click", () => {
-      if (!contextAlive()) return; // engine's own toast can't run without a context either
       bootPromise.then((engine) => engine.toggle()).catch(() => {});
     });
     controls.prepend(btn);

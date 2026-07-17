@@ -1,10 +1,10 @@
 # VoiceOne — Privacy Policy
 
-_Last updated: 2026-07-08_
+_Last updated: 2026-07-17_
 
 VoiceOne is a Chrome extension that translates selected text and reads it aloud — and can
-dub YouTube videos — using Chrome's built‑in, on‑device AI. This policy explains what data
-the extension handles.
+dub videos on YouTube and on video sites you explicitly enable — using Chrome's built‑in,
+on‑device AI. This policy explains what data the extension handles.
 
 ## Summary
 
@@ -26,11 +26,11 @@ analytics, advertising, or tracking service. There are no developer‑operated s
   - Selected text is held only in memory for the duration of a read‑aloud action and is **not
     persisted**.
 
-- **YouTube video captions (dubbing).** When you click the dub button on a YouTube video,
-  VoiceOne fetches that video's **caption track**:
-  - Caption requests go **only to YouTube itself** (`youtube.com`), from your own browser
-    session — the same way the site loads captions for its player. No other server is
-    contacted, and nothing is sent to the developer.
+- **Video captions (dubbing).** When you start a dub — on YouTube, or on a video site you
+  have explicitly enabled — VoiceOne reads that video's **caption track**:
+  - Caption data comes **only from the site you are watching** (e.g. `youtube.com`), from
+    your own browser session — the same way the site loads captions for its player. No
+    other server is contacted, and nothing is sent to the developer.
   - Captions are **translated on your device** by Chrome's built‑in Translator and narrated
     with your browser's speech synthesis. As with read‑aloud, choosing one of Chrome's
     **online ("Google") voices** means Chrome sends the text to its speech service under
@@ -54,9 +54,15 @@ analytics, advertising, or tracking service. There are no developer‑operated s
 
 VoiceOne requests the minimum permissions needed: `tts` (read aloud), `contextMenus`
 (right‑click menu), `scripting` + `activeTab` (show the panel / read the selection on the
-current tab only when you invoke the extension), and `storage` (save your preferences). Its
-only site access is **youtube.com**, used solely to show the dub button and load captions
-for the dubbing feature — it does **not** request access to other websites.
+current tab only when you invoke the extension), `storage` (save your preferences), and
+`sidePanel` (show the settings page docked beside the tab).
+
+Site access is opt‑in per site. Out of the box the only site access is **youtube.com**
+(the dub button and caption loading). Any other site gets access **only if you enable it
+yourself** via the popup's "Enable dubbing on this site" — each grant goes through Chrome's
+own permission prompt, is used solely to read that site's captions and control the video's
+volume for dubbing, and can be revoked at any time from `chrome://extensions` → VoiceOne →
+Site access.
 
 ## Contact
 

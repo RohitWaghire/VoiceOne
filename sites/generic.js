@@ -46,13 +46,21 @@
       .trim();
 
   let cap = null; // lib/captions.js exports
+  let flippedTrack = null; // track we switched disabled → hidden; restore on stop
 
   const adapter = {
     getVideo,
     // SPA sites change the URL per video; same-URL video swaps are out of scope.
     videoKey: () => location.pathname + location.search,
     isAdShowing: () => false,
-    onStateChange: null, // no on-page button; the popup reflects state via snapshots
+    // No on-page button; the popup reflects state via snapshots. Used here to
+    // put a track we enabled back the way the site had it.
+    onStateChange: (mode) => {
+      if (mode === "off" && flippedTrack) {
+        flippedTrack.mode = "disabled";
+        flippedTrack = null;
+      }
+    },
     async getCues(target, isSuperseded) {
       const video = getVideo();
       if (!video) throw new Error("no video player found on this page.");
@@ -67,7 +75,10 @@
         tracks.find((t) => (t.language || "").toLowerCase().split("-")[0] === tgt) || tracks[0];
 
       // Cues only populate once the track is enabled; "hidden" parses without rendering.
-      if (track.mode === "disabled") track.mode = "hidden";
+      if (track.mode === "disabled") {
+        track.mode = "hidden";
+        flippedTrack = track;
+      }
       const deadline = Date.now() + 4000;
       while ((!track.cues || !track.cues.length) && Date.now() < deadline) {
         if (isSuperseded()) return null;

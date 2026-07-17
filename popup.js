@@ -135,10 +135,13 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
     langSel.addEventListener("change", () => sendYt("lang", { code: langSel.value }));
 
     toggleBtn.addEventListener("click", async () => {
+      // Re-query: the dub may have been started/stopped from the page while
+      // this popup sat open, making the snapshot stale.
+      const live = (await sendYt("state")) || st;
       await sendYt("toggle");
-      if (!st.active) window.close(); // starting — get out of the way, panel appears on page
+      if (!live.active) window.close(); // starting — get out of the way, panel appears on page
       else setToggle(false, false);
-      st.active = !st.active;
+      st.active = !live.active;
     });
 
     const duck = $("ytDuck");
@@ -178,8 +181,8 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
       .request({ origins: [originPattern] })
       .catch(() => false);
     if (!ok) return; // user declined Chrome's prompt
-    await chrome.scripting
-      .registerContentScripts([
+    try {
+      await chrome.scripting.registerContentScripts([
         {
           id: "voiceone-dub:" + originPattern,
           matches: [originPattern],
@@ -187,8 +190,16 @@ chrome.storage.session.get("voiceoneView").then(({ voiceoneView }) => render(voi
           runAt: "document_idle",
           persistAcrossSessions: true,
         },
-      ])
-      .catch(() => {}); // already registered from an earlier grant → fine
+      ]);
+    } catch (err) {
+      // A leftover registration from an earlier grant is fine; anything else
+      // is a real failure the user should see.
+      if (!String(err?.message).includes("Duplicate")) {
+        console.warn("[VoiceOne] site registration failed:", err);
+        $("ytStatus").textContent = "couldn't enable — try again";
+        return;
+      }
+    }
     await chrome.scripting
       .executeScript({ target: { tabId: tab.id }, files: ["sites/generic.js"] })
       .catch(() => {});

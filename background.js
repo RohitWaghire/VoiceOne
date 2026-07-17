@@ -137,6 +137,7 @@ async function detectLanguage(text) {
 }
 
 const translatorCache = new Map(); // `${src}>${tgt}` -> Translator
+const TRANSLATOR_CACHE_MAX = 5; // language pairs kept alive at once
 
 async function getTranslator(src, tgt, onProgress) {
   const key = `${src}>${tgt}`;
@@ -156,6 +157,11 @@ async function getTranslator(src, tgt, onProgress) {
     },
   });
   translatorCache.set(key, translator);
+  if (translatorCache.size > TRANSLATOR_CACHE_MAX) {
+    const [oldKey, oldTranslator] = translatorCache.entries().next().value; // oldest insertion
+    translatorCache.delete(oldKey);
+    oldTranslator.destroy?.();
+  }
   return translator;
 }
 
