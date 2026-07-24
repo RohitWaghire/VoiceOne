@@ -1,0 +1,59 @@
+# VoiceOne
+
+> A Chrome Manifest V3 extension that translates selected text and reads it aloud, and dubs
+> captioned videos into a chosen language with one click — entirely on Chrome's built-in,
+> on-device AI. No account, no server, no analytics; nothing the user watches or selects leaves
+> the machine.
+
+VoiceOne has two features, both built on Chrome's built-in `Translator` / `LanguageDetector`
+APIs and the native `chrome.tts` speech API:
+
+- **Selection read-aloud** — right-click selected text → translate → speak, in a floating panel.
+- **Video dubbing** — re-narrates a video's caption track in a chosen language over ducked
+  original audio, synchronized to the player clock. Works on YouTube out of the box (button in the
+  player); every other site is opt-in per-origin via the toolbar popup.
+
+There is **no build system, bundler, framework, or package.json** — source files ship as-is and
+must be plain ES that Chrome runs directly. Requires Chrome 138+. Current version: 1.3.0.
+Licensed MIT © 2026 Rohit Waghire.
+
+Key architectural constraint: `chrome.tts` and the built-in AI APIs live in the service worker,
+so the SW owns all speech and translation; injected UI scripts message it. Files under
+`web_accessible_resources` (the `lib/*` modules a content script dynamically imports) must be
+**leaf modules with no import statements** — under `use_dynamic_url`, Chrome fails sub-imports of a
+module graph loaded via the rotating GUID URL. That is why the dub engine takes its caption and
+language helpers as parameters rather than importing them.
+
+## Documentation
+
+- [README](https://github.com/RohitWaghire/VoiceOne/blob/main/README.md): Features, supported sites, install, usage, troubleshooting, project layout.
+- [CLAUDE.md](https://github.com/RohitWaghire/VoiceOne/blob/main/CLAUDE.md): Architecture guide — why the code is split as it is, message routing, permission model, the YouTube caption gotcha, dub-engine invariants.
+- [PRIVACY.md](https://github.com/RohitWaghire/VoiceOne/blob/main/PRIVACY.md): Privacy policy — what is processed on-device and why nothing is transmitted.
+- [LICENSE](https://github.com/RohitWaghire/VoiceOne/blob/main/LICENSE): MIT License.
+
+## Core source
+
+- [manifest.json](https://github.com/RohitWaghire/VoiceOne/blob/main/manifest.json): MV3 manifest — permissions (`activeTab` only; sites opt-in via `optional_host_permissions`), side panel, web-accessible resources, YouTube content script.
+- [background.js](https://github.com/RohitWaghire/VoiceOne/blob/main/background.js): Service worker — context menu, language detection, translation, `chrome.tts`, authoritative panel state, per-site content-script registration.
+- [lib/dub-engine.js](https://github.com/RohitWaghire/VoiceOne/blob/main/lib/dub-engine.js): Site-agnostic dub engine — cue scheduling, audio duck, floating dub panel, translation batching, popup remote API. Consumes a per-site adapter. A WAR leaf module.
+- [panel.js](https://github.com/RohitWaghire/VoiceOne/blob/main/panel.js): Floating read-aloud control panel, injected on demand, rendered into a Shadow DOM.
+
+## Site adapters
+
+- [youtube.js](https://github.com/RohitWaghire/VoiceOne/blob/main/youtube.js): YouTube adapter — player button, InnerTube caption fetch (ANDROID client + visitorData + cookies to pass the 2025 pot-gating), ad detection, SPA-navigation glue.
+- [sites/generic.js](https://github.com/RohitWaghire/VoiceOne/blob/main/sites/generic.js): Adapter for every other site — generic HTML5 `textTracks`, plus dedicated Vimeo, Dailymotion (incl. embedded iframe players), and Bilibili caption paths, keyed by hostname.
+
+## Libraries (pure ESM, unit-testable, no chrome.*/DOM)
+
+- [lib/captions.js](https://github.com/RohitWaghire/VoiceOne/blob/main/lib/captions.js): Caption parsers — YouTube json3/srv3, WebVTT, SRT, Bilibili subtitle JSON — plus cue merging and lookup.
+- [lib/languages.js](https://github.com/RohitWaghire/VoiceOne/blob/main/lib/languages.js): Language list and TTS voice-locale hints.
+
+## Extension pages
+
+- [popup.html](https://github.com/RohitWaghire/VoiceOne/blob/main/popup.html) / [popup.js](https://github.com/RohitWaghire/VoiceOne/blob/main/popup.js): Toolbar popup — read/translate controls, dub controls, and per-site enablement (`chrome.permissions.request` + `chrome.scripting.registerContentScripts` in the click gesture).
+- [options.html](https://github.com/RohitWaghire/VoiceOne/blob/main/options.html) / [options.js](https://github.com/RohitWaghire/VoiceOne/blob/main/options.js): Preferences, shown in a side panel — voice, rate, pitch, volume, default target language, original-audio duck level, and the editable language menu.
+
+## Optional
+
+- [Chrome Web Store listing](https://chromewebstore.google.com/detail/voiceone/ingbabpokfkldjjpbgjkmfichemjagii): Install the published extension.
+- [Releases](https://github.com/RohitWaghire/VoiceOne/releases): Tagged versions with packaged ZIPs and notes.
