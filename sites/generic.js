@@ -174,6 +174,22 @@
     return { cues, sourceLang: langBase(lang) || target };
   }
 
+  // Fetch Bilibili's wbi signing keys and sign a param object. Returns the
+  // signed query string, or null on any failure so the caller falls back to
+  // the unsigned endpoint. credentials:"include" so the keys reflect the
+  // logged-in session.
+  async function biliSignedQuery(params) {
+    try {
+      const nav = await (
+        await fetch("https://api.bilibili.com/x/web-interface/nav", { credentials: "include" })
+      ).json();
+      const wi = nav?.data?.wbi_img || {};
+      return cap.wbiSign(params, wi.img_url, wi.sub_url);
+    } catch {
+      return null;
+    }
+  }
+
   // Bilibili: view API resolves bvid → cid, player API lists CC subtitle
   // JSON. Uses the tab's own session (subtitle URLs are login-gated for many
   // videos); "ai-" prefixed lan codes are Bilibili's auto-generated tracks.
@@ -186,9 +202,15 @@
     ).json();
     const cid = view?.data?.cid;
     if (!cid) throw new Error("couldn't load this Bilibili video's details.");
-    const player = await (
-      await fetch(`https://api.bilibili.com/x/player/v2?bvid=${bvid}&cid=${cid}`, { credentials: "include" })
-    ).json();
+    // The CC list is wbi-gated: the legacy player/v2 endpoint returns an empty
+    // subtitle array for many videos (esp. AI-generated tracks), while the
+    // signed player/wbi/v2 returns them for a logged-in session. Sign when we
+    // can; fall back to the unsigned endpoint if nav/signing is unavailable.
+    const q = await biliSignedQuery({ bvid, cid });
+    const playerUrl = q
+      ? `https://api.bilibili.com/x/player/wbi/v2?${q}`
+      : `https://api.bilibili.com/x/player/v2?bvid=${bvid}&cid=${cid}`;
+    const player = await (await fetch(playerUrl, { credentials: "include" })).json();
     if (isSuperseded()) return null;
     const subs = player?.data?.subtitle?.subtitles || [];
     if (!subs.length)
